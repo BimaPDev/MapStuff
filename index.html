@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>US Interactive Map</title>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; }
+    #map { width: 100vw; height: 100vh; }
+
+    #tooltip {
+      position: absolute;
+      background: rgba(10, 10, 30, 0.92);
+      color: #e0e0ff;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      pointer-events: none;
+      display: none;
+      border: 1px solid rgba(100, 120, 255, 0.4);
+      backdrop-filter: blur(4px);
+      z-index: 10;
+    }
+
+    #info {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(10, 10, 30, 0.85);
+      color: #c0c8ff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      border: 1px solid rgba(100, 120, 255, 0.3);
+      backdrop-filter: blur(6px);
+      max-width: 220px;
+      z-index: 10;
+    }
+    #info h2 { color: #8899ff; margin-bottom: 6px; font-size: 15px; }
+    #info p { line-height: 1.5; opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="tooltip"></div>
+  <div id="info">
+    <h2>US Interactive Map</h2>
+    <p>Hover to highlight states.<br/>Scroll to zoom, drag to pan.</p>
+  </div>
+
+  <script>
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+      center: [-98.5, 39.5],
+      zoom: 3.8,
+      minZoom: 2.5,
+      maxZoom: 10,
+      maxBounds: [[-180, 10], [-50, 75]]
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.addControl(new maplibregl.ScaleControl(), 'bottom-right');
+
+    const tooltip = document.getElementById('tooltip');
+
+    map.on('load', async () => {
+      // Load US states GeoJSON from a public source
+      const res = await fetch(
+        'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
+      );
+      const geojson = await res.json();
+
+      map.addSource('states', { type: 'geojson', data: geojson });
+
+      // Fill layer
+      map.addLayer({
+        id: 'states-fill',
+        type: 'fill',
+        source: 'states',
+        paint: {
+          'fill-color': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            '#5566ff',
+            '#2a3060'
+          ],
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.7,
+            0.45
+          ]
+        }
+      });
+
+      // Border layer
+      map.addLayer({
+        id: 'states-border',
+        type: 'line',
+        source: 'states',
+        paint: {
+          'line-color': '#7788ff',
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            2,
+            0.8
+          ],
+          'line-opacity': 0.8
+        }
+      });
+
+      // State labels
+      map.addLayer({
+        id: 'states-label',
+        type: 'symbol',
+        source: 'states',
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 3, 8, 6, 13],
+          'text-anchor': 'center',
+          'text-allow-overlap': false
+        },
+        paint: {
+          'text-color': '#c0caff',
+          'text-halo-color': '#0a0a1e',
+          'text-halo-width': 1.5
+        }
+      });
+
+      let hoveredId = null;
+
+      map.on('mousemove', 'states-fill', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = e.features[0];
+        if (!feature) return;
+
+        if (hoveredId !== null) {
+          map.setFeatureState({ source: 'states', id: hoveredId }, { hover: false });
+        }
+        hoveredId = feature.id;
+        map.setFeatureState({ source: 'states', id: hoveredId }, { hover: true });
+
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.point.x + 14) + 'px';
+        tooltip.style.top = (e.point.y - 10) + 'px';
+        tooltip.textContent = feature.properties.name;
+      });
+
+      map.on('mouseleave', 'states-fill', () => {
+        map.getCanvas().style.cursor = '';
+        if (hoveredId !== null) {
+          map.setFeatureState({ source: 'states', id: hoveredId }, { hover: false });
+        }
+        hoveredId = null;
+        tooltip.style.display = 'none';
+      });
+
+      // Click handler
+      map.on('click', 'states-fill', (e) => {
+        const name = e.features[0]?.properties?.name;
+        if (!name) return;
+        new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+          .setLngLat(e.lngLat)
+          .setHTML(`<strong style="color:#8899ff">${name}</strong><br/><span style="font-size:12px;color:#aaa">Click map to dismiss</span>`)
+          .addTo(map);
+      });
+    });
+  </script>
+</body>
+</html>
