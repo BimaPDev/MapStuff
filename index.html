@@ -3,174 +3,517 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>US Interactive Map</title>
+  <title>US Air Quality Map</title>
+
+  <!-- ======================================================
+       DEPENDENCIES
+  ====================================================== -->
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <!-- Embedded as JS var to avoid file:// CORS block -->
+  <script src="./data/sites.js"></script>
+
+  <!-- ======================================================
+       STYLES
+  ====================================================== -->
   <style>
+    /* ----- Base ----- */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; background: #1a1a2e; }
     #map { width: 100vw; height: 100vh; }
 
+    /* ----- Tooltip ----- */
     #tooltip {
       position: absolute;
       background: rgba(10, 10, 30, 0.92);
       color: #e0e0ff;
       padding: 8px 14px;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       pointer-events: none;
       display: none;
       border: 1px solid rgba(100, 120, 255, 0.4);
       backdrop-filter: blur(4px);
       z-index: 10;
+      max-width: 200px;
+      line-height: 1.5;
     }
 
-    #info {
+    /* ----- 2D / 3D Toggle Button ----- */
+    #toggle-btn {
       position: absolute;
       top: 16px;
       left: 16px;
-      background: rgba(10, 10, 30, 0.85);
-      color: #c0c8ff;
-      padding: 12px 18px;
+      z-index: 10;
+      background: rgba(10, 10, 40, 0.9);
+      color: #c0caff;
+      border: 1px solid rgba(100, 120, 255, 0.5);
+      padding: 9px 18px;
       border-radius: 8px;
       font-size: 13px;
-      border: 1px solid rgba(100, 120, 255, 0.3);
+      font-weight: 600;
+      cursor: pointer;
       backdrop-filter: blur(6px);
-      max-width: 220px;
+      transition: background 0.2s;
+      letter-spacing: 0.03em;
+    }
+    #toggle-btn:hover { background: rgba(80, 100, 255, 0.35); }
+
+    /* ----- County Loading Indicator ----- */
+    #loading {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 10, 30, 0.9);
+      color: #8899ff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      border: 1px solid rgba(100, 120, 255, 0.4);
+      display: none;
       z-index: 10;
     }
-    #info h2 { color: #8899ff; margin-bottom: 6px; font-size: 15px; }
-    #info p { line-height: 1.5; opacity: 0.85; }
+
+    /* ----- AQI Legend ----- */
+    #legend {
+      position: absolute;
+      bottom: 40px;
+      left: 16px;
+      background: rgba(10, 10, 30, 0.85);
+      color: #c0c8ff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      border: 1px solid rgba(100, 120, 255, 0.3);
+      backdrop-filter: blur(6px);
+      z-index: 10;
+      line-height: 1.8;
+    }
+    #legend .dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
+
+  <!-- ======================================================
+       HTML STRUCTURE
+  ====================================================== -->
   <div id="map"></div>
   <div id="tooltip"></div>
-  <div id="info">
-    <h2>US Interactive Map</h2>
-    <p>Hover to highlight states.<br/>Scroll to zoom, drag to pan.</p>
+  <button id="toggle-btn">Switch to 3D</button>
+  <div id="loading">Loading county data...</div>
+  <div id="legend">
+    <div><span class="dot" style="background:#00e400"></span>Good (0–50)</div>
+    <div><span class="dot" style="background:#ffff00"></span>Moderate (51–100)</div>
+    <div><span class="dot" style="background:#ff7e00"></span>Unhealthy for Some (101–150)</div>
+    <div><span class="dot" style="background:#ff0000"></span>Unhealthy (151–200)</div>
+    <div><span class="dot" style="background:#8f3f97"></span>Very Unhealthy (201+)</div>
+    <div><span class="dot" style="background:#607090"></span>No Data</div>
   </div>
 
   <script>
+    // ======================================================
+    // CONSTANTS & HELPERS
+    // ======================================================
+
+    const COUNTY_ZOOM = 5;
+
+    function aqiColor(aqi) {
+      if (aqi == null) return '#607090';
+      if (aqi <= 50)   return '#00e400';
+      if (aqi <= 100)  return '#ffff00';
+      if (aqi <= 150)  return '#ff7e00';
+      if (aqi <= 200)  return '#ff0000';
+      return '#8f3f97';
+    }
+
+    // Pre-bake circle color into each feature so MapLibre can use ['get', 'color']
+    SITES_DATA.features.forEach(f => {
+      f.properties.color = aqiColor(f.properties.aqi);
+    });
+
+
+    // ======================================================
+    // MAP STUFF
+    // ======================================================
+
     const map = new maplibregl.Map({
       container: 'map',
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
       center: [-98.5, 39.5],
       zoom: 3.8,
       minZoom: 2.5,
-      maxZoom: 10,
+      maxZoom: 12,
       maxBounds: [[-180, 10], [-50, 75]]
     });
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.addControl(new maplibregl.ScaleControl(), 'bottom-right');
 
-    const tooltip = document.getElementById('tooltip');
+    const tooltip   = document.getElementById('tooltip');
+    const loadingEl = document.getElementById('loading');
+    const toggleBtn = document.getElementById('toggle-btn');
 
-    map.on('load', async () => {
-      // Load US states GeoJSON from a public source
-      const res = await fetch(
+    let countiesLoaded  = false;
+    let countiesLoading = false;
+    let is3D            = false;
+    let threeLayer      = null;
+
+
+    // ======================================================
+    // LAYER — STATES 
+    // ======================================================
+
+    async function addStatesLayer() {
+      const geojson = await fetch(
         'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
-      );
-      const geojson = await res.json();
+      ).then(r => r.json());
 
       map.addSource('states', { type: 'geojson', data: geojson });
 
-      // Fill layer
       map.addLayer({
-        id: 'states-fill',
-        type: 'fill',
-        source: 'states',
+        id: 'states-fill', type: 'fill', source: 'states',
         paint: {
-          'fill-color': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            '#5566ff',
-            '#2a3060'
-          ],
-          'fill-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            0.7,
-            0.45
-          ]
+          'fill-color':   ['case', ['boolean', ['feature-state', 'hover'], false], '#5566ff', '#2a3060'],
+          'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.7, 0.45]
         }
       });
 
-      // Border layer
       map.addLayer({
-        id: 'states-border',
-        type: 'line',
-        source: 'states',
+        id: 'states-border', type: 'line', source: 'states',
         paint: {
-          'line-color': '#7788ff',
-          'line-width': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            2,
-            0.8
-          ],
-          'line-opacity': 0.8
+          'line-color':   '#7788ff',
+          'line-width':   ['case', ['boolean', ['feature-state', 'hover'], false], 2, 1],
+          'line-opacity': 0.9
         }
       });
 
-      // State labels
       map.addLayer({
-        id: 'states-label',
-        type: 'symbol',
-        source: 'states',
+        id: 'states-label', type: 'symbol', source: 'states',
         layout: {
-          'text-field': ['get', 'name'],
-          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 3, 8, 6, 13],
-          'text-anchor': 'center',
+          'text-field':         ['get', 'name'],
+          'text-font':          ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size':          ['interpolate', ['linear'], ['zoom'], 3, 8, 6, 13],
+          'text-anchor':        'center',
           'text-allow-overlap': false
         },
         paint: {
-          'text-color': '#c0caff',
+          'text-color':      '#c0caff',
           'text-halo-color': '#0a0a1e',
           'text-halo-width': 1.5
         }
       });
+    }
 
-      let hoveredId = null;
 
+    // ======================================================
+    // LAYER — COUNTIES
+    // ======================================================
+
+    async function loadCounties() {
+      if (countiesLoaded || countiesLoading) return;
+      countiesLoading = true;
+      loadingEl.style.display = 'block';
+
+      try {
+        const geojson = await fetch(
+          'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
+        ).then(r => r.json());
+
+        map.addSource('counties', { type: 'geojson', data: geojson, generateId: true });
+
+        map.addLayer({
+          id: 'counties-fill', type: 'fill', source: 'counties',
+          paint: {
+            'fill-color':   '#7788ff',
+            'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.45, 0]
+          }
+        }, 'states-fill');
+
+        map.addLayer({
+          id: 'counties-border', type: 'line', source: 'counties',
+          paint: {
+            'line-color':   '#4455aa',
+            'line-width':   0.6,
+            'line-opacity': ['interpolate', ['linear'], ['zoom'], COUNTY_ZOOM, 0, COUNTY_ZOOM + 0.5, 0.7]
+          }
+        }, 'states-border');
+
+        countiesLoaded = true;
+      } catch (err) {
+        console.error('County load failed:', err);
+        countiesLoading = false;
+      } finally {
+        loadingEl.style.display = 'none';
+      }
+    }
+
+
+    // ======================================================
+    // LAYER — COLLECTION SITES 2D
+    // ======================================================
+
+    function addSites2DLayer() {
+      map.addSource('sites', { type: 'geojson', data: SITES_DATA });
+
+      map.addLayer({
+        id: 'sites-2d', type: 'circle', source: 'sites',
+        paint: {
+          'circle-color':          ['get', 'color'],
+          'circle-radius':         ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 7],
+          'circle-opacity':        0.85,
+          'circle-stroke-color':   '#ffffff',
+          'circle-stroke-width':   0.5,
+          'circle-stroke-opacity': 0.4
+        }
+      });
+    }
+
+
+    // ======================================================
+    // LAYER — COLLECTION SITES 3D 
+    // ======================================================
+
+    function buildThreeLayer() {
+      return {
+        id: 'sites-3d',
+        type: 'custom',
+        renderingMode: '3d',
+
+        onAdd(map, gl) {
+          this.map    = map;
+          this.camera = new THREE.Camera();
+          this.scene  = new THREE.Scene();
+
+          // Cylinder baked to Z-up so +Z aligns with Mercator altitude axis
+          const geo = new THREE.CylinderGeometry(1, 1, 1, 6);
+          geo.rotateX(Math.PI / 2);
+
+          const mat = new THREE.MeshPhongMaterial({
+            vertexColors: true,
+            transparent:  true,
+            opacity:      0.9
+          });
+
+          const mesh = new THREE.InstancedMesh(geo, mat, SITES_DATA.features.length);
+          mesh.frustumCulled = false; // bounding sphere only covers one instance otherwise
+
+          const dummy = new THREE.Object3D();
+          const color = new THREE.Color();
+
+          SITES_DATA.features.forEach((f, i) => {
+            const [lon, lat] = f.geometry.coordinates;
+            const aqi        = f.properties.aqi;
+            const coord      = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
+            const s          = coord.meterInMercatorCoordinateUnits();
+
+            // Heights in meters — must be large enough to appear at national zoom
+            const heightM = aqi != null ? Math.max(aqi * 2500, 120000) : 150000;
+            const radiusM = 32000;
+
+            dummy.position.set(coord.x, coord.y, heightM * s * 0.5);
+            dummy.scale.set(radiusM * s, radiusM * s, heightM * s);
+            dummy.updateMatrix();
+
+            mesh.setMatrixAt(i, dummy.matrix);
+            color.set(aqiColor(aqi));
+            mesh.setColorAt(i, color);
+          });
+
+          mesh.instanceMatrix.needsUpdate = true;
+          mesh.instanceColor.needsUpdate  = true;
+          this.scene.add(mesh);
+
+          this.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+          const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+          dir.position.set(1, -1, 2).normalize();
+          this.scene.add(dir);
+
+          this.renderer = new THREE.WebGLRenderer({
+            canvas:    map.getCanvas(),
+            context:   gl,
+            antialias: true
+          });
+          this.renderer.autoClear = false;
+        },
+
+        render(gl, args) {
+          const m = new THREE.Matrix4().fromArray(args.defaultProjectionData.mainMatrix);
+          this.camera.projectionMatrix = m;
+          this.renderer.resetState();
+          this.renderer.render(this.scene, this.camera);
+          this.map.triggerRepaint();
+        }
+      };
+    }
+
+
+    // ======================================================
+    // 2D / 3D TOGGLE
+    // ======================================================
+
+    toggleBtn.addEventListener('click', () => {
+      is3D = !is3D;
+      toggleBtn.textContent = is3D ? 'Switch to 2D' : 'Switch to 3D';
+
+      if (is3D) {
+        map.setLayoutProperty('sites-2d', 'visibility', 'none');
+        if (!map.getLayer('sites-3d')) map.addLayer(threeLayer);
+        map.easeTo({ pitch: 55, bearing: -20, duration: 900 });
+      } else {
+        if (map.getLayer('sites-3d')) map.removeLayer('sites-3d');
+        map.setLayoutProperty('sites-2d', 'visibility', 'visible');
+        map.easeTo({ pitch: 0, bearing: 0, duration: 900 });
+      }
+    });
+
+
+    // ======================================================
+    // INTERACTIONS — HOVER & CLICK
+    // ======================================================
+
+    function setupInteractions() {
+      let hoveredStateId  = null;
+      let hoveredCountyId = null;
+
+      function clearStateHover() {
+        if (hoveredStateId !== null) {
+          map.setFeatureState({ source: 'states', id: hoveredStateId }, { hover: false });
+          hoveredStateId = null;
+        }
+      }
+
+      function clearCountyHover() {
+        if (hoveredCountyId !== null) {
+          map.setFeatureState({ source: 'counties', id: hoveredCountyId }, { hover: false });
+          hoveredCountyId = null;
+        }
+      }
+
+      // ----- State / County hover -----
       map.on('mousemove', 'states-fill', (e) => {
         map.getCanvas().style.cursor = 'pointer';
-        const feature = e.features[0];
-        if (!feature) return;
 
-        if (hoveredId !== null) {
-          map.setFeatureState({ source: 'states', id: hoveredId }, { hover: false });
+        if (countiesLoaded && map.getZoom() >= COUNTY_ZOOM) {
+          clearStateHover();
+          const [county] = map.queryRenderedFeatures(e.point, { layers: ['counties-fill'] });
+          if (county) {
+            if (hoveredCountyId !== county.id) {
+              clearCountyHover();
+              hoveredCountyId = county.id;
+              map.setFeatureState({ source: 'counties', id: county.id }, { hover: true });
+            }
+            tooltip.style.display = 'block';
+            tooltip.style.left    = (e.point.x + 14) + 'px';
+            tooltip.style.top     = (e.point.y - 10) + 'px';
+            tooltip.textContent   = (county.properties.NAME || '') + ' County';
+          }
+        } else {
+          clearCountyHover();
+          const feat = e.features[0];
+          if (!feat) return;
+          if (hoveredStateId !== feat.id) {
+            clearStateHover();
+            hoveredStateId = feat.id;
+            map.setFeatureState({ source: 'states', id: feat.id }, { hover: true });
+          }
+          tooltip.style.display = 'block';
+          tooltip.style.left    = (e.point.x + 14) + 'px';
+          tooltip.style.top     = (e.point.y - 10) + 'px';
+          tooltip.textContent   = feat.properties.name;
         }
-        hoveredId = feature.id;
-        map.setFeatureState({ source: 'states', id: hoveredId }, { hover: true });
-
-        tooltip.style.display = 'block';
-        tooltip.style.left = (e.point.x + 14) + 'px';
-        tooltip.style.top = (e.point.y - 10) + 'px';
-        tooltip.textContent = feature.properties.name;
       });
 
       map.on('mouseleave', 'states-fill', () => {
         map.getCanvas().style.cursor = '';
-        if (hoveredId !== null) {
-          map.setFeatureState({ source: 'states', id: hoveredId }, { hover: false });
-        }
-        hoveredId = null;
+        clearStateHover();
+        clearCountyHover();
         tooltip.style.display = 'none';
       });
 
-      // Click handler
-      map.on('click', 'states-fill', (e) => {
-        const name = e.features[0]?.properties?.name;
-        if (!name) return;
+      // ----- Site marker hover -----
+      map.on('mousemove', 'sites-2d', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const f = e.features[0];
+        if (!f) return;
+        const p = f.properties;
+        tooltip.style.display = 'block';
+        tooltip.style.left    = (e.point.x + 14) + 'px';
+        tooltip.style.top     = (e.point.y - 10) + 'px';
+        tooltip.innerHTML     = `<strong>${p.name}</strong><br/>${p.state}${p.aqi != null ? `<br/>AQI: ${p.aqi}` : ''}`;
+      });
+
+      map.on('mouseleave', 'sites-2d', () => {
+        map.getCanvas().style.cursor = '';
+        tooltip.style.display = 'none';
+      });
+
+      // ----- Site marker click -----
+      map.on('click', 'sites-2d', (e) => {
+        const p = e.features[0]?.properties;
+        if (!p) return;
         new maplibregl.Popup({ closeButton: true, closeOnClick: true })
           .setLngLat(e.lngLat)
-          .setHTML(`<strong style="color:#8899ff">${name}</strong><br/><span style="font-size:12px;color:#aaa">Click map to dismiss</span>`)
+          .setHTML(`
+            <strong style="color:#8899ff">${p.name}</strong><br/>
+            <span style="color:#aaa">${p.state}</span>
+            ${p.aqi != null ? `<br/>AQI: <strong>${p.aqi}</strong>` : ''}
+          `)
           .addTo(map);
       });
+
+      // ----- State / County click -----
+      map.on('click', 'states-fill', (e) => {
+        // Let site clicks take priority
+        if (map.queryRenderedFeatures(e.point, { layers: ['sites-2d'] }).length) return;
+
+        if (countiesLoaded && map.getZoom() >= COUNTY_ZOOM) {
+          const [county] = map.queryRenderedFeatures(e.point, { layers: ['counties-fill'] });
+          if (county) {
+            new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+              .setLngLat(e.lngLat)
+              .setHTML(`
+                <strong style="color:#8899ff">${county.properties.NAME} County</strong><br/>
+                <span style="color:#aaa">${e.features[0]?.properties?.name ?? ''}</span>
+              `)
+              .addTo(map);
+          }
+        } else {
+          const name = e.features[0]?.properties?.name;
+          if (!name) return;
+          new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+            .setLngLat(e.lngLat)
+            .setHTML(`<strong style="color:#8899ff">${name}</strong>`)
+            .addTo(map);
+        }
+      });
+    }
+
+
+    // ======================================================
+    // BOOT  — wire everything up on map load
+    // ======================================================
+
+    map.on('load', async () => {
+      await addStatesLayer();
+      addSites2DLayer();
+
+      threeLayer = buildThreeLayer();
+
+      // County lines load lazily when user zooms in
+      if (map.getZoom() >= COUNTY_ZOOM) loadCounties();
+      map.on('zoom',     () => { if (map.getZoom() >= COUNTY_ZOOM) loadCounties(); });
+      map.on('dblclick', () => loadCounties());
+
+      setupInteractions();
     });
   </script>
 </body>
