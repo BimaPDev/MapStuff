@@ -13,6 +13,7 @@
   <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
   <!-- Embedded as JS var to avoid file:// CORS block -->
   <script src="./data/sites.js"></script>
+  <script src="./data/historical.js"></script>
 
   <!-- ======================================================
        STYLES
@@ -64,7 +65,7 @@
     /* ----- County Loading Indicator ----- */
     #loading {
       position: absolute;
-      bottom: 40px;
+      bottom: 110px;
       left: 50%;
       transform: translateX(-50%);
       background: rgba(10, 10, 30, 0.9);
@@ -75,6 +76,80 @@
       border: 1px solid rgba(100, 120, 255, 0.4);
       display: none;
       z-index: 10;
+    }
+
+    /* ----- Year Slider ----- */
+    #year-slider {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(10, 10, 35, 0.92);
+      padding: 10px 22px;
+      border-radius: 32px;
+      border: 1px solid rgba(100, 120, 255, 0.45);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      white-space: nowrap;
+    }
+    #year-display {
+      font-size: 20px;
+      font-weight: 700;
+      color: #c0caff;
+      min-width: 52px;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+    #year-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 280px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(100, 120, 255, 0.3);
+      outline: none;
+      cursor: pointer;
+    }
+    #year-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #7788ff;
+      border: 2px solid #fff;
+      box-shadow: 0 0 6px rgba(100, 120, 255, 0.8);
+      cursor: pointer;
+    }
+    #year-range::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #7788ff;
+      border: 2px solid #fff;
+      box-shadow: 0 0 6px rgba(100, 120, 255, 0.8);
+      cursor: pointer;
+    }
+    .year-btn {
+      background: none;
+      border: none;
+      color: #8899ff;
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+      transition: color 0.15s;
+    }
+    .year-btn:hover { color: #fff; }
+    #year-label {
+      font-size: 11px;
+      color: #6677aa;
+      text-align: center;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
     }
 
     /* ----- AQI Legend ----- */
@@ -110,6 +185,14 @@
   <div id="tooltip"></div>
   <button id="toggle-btn">Switch to 3D</button>
   <div id="loading">Loading county data...</div>
+
+  <div id="year-slider">
+    <div id="year-label">Year</div>
+    <button class="year-btn" id="year-prev">&#8249;</button>
+    <input type="range" id="year-range" min="0" step="1" value="0" />
+    <button class="year-btn" id="year-next">&#8250;</button>
+    <div id="year-display">—</div>
+  </div>
   <div id="legend">
     <div><span class="dot" style="background:#00e400"></span>Good (0–50)</div>
     <div><span class="dot" style="background:#ffff00"></span>Moderate (51–100)</div>
@@ -126,6 +209,9 @@
 
     const COUNTY_ZOOM = 5;
 
+    const YEARS = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b);
+    let currentYearIdx = YEARS.length - 1;
+
     function aqiColor(aqi) {
       if (aqi == null) return '#607090';
       if (aqi <= 50)   return '#00e400';
@@ -133,6 +219,30 @@
       if (aqi <= 150)  return '#ff7e00';
       if (aqi <= 200)  return '#ff0000';
       return '#8f3f97';
+    }
+
+    function yearToGeoJSON(year) {
+      const sites = HISTORICAL_DATA[year] || [];
+      return {
+        type: 'FeatureCollection',
+        features: sites.map(s => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [s.lon, s.lat] },
+          properties: {
+            name:   s.name   || '',
+            state:  s.state  || '',
+            county: s.county || '',
+            aqi:    s.aqi    ?? null,
+            pm25:   s['PM2.5']  ?? null,
+            ozone:  s['Ozone']  ?? null,
+            no2:    s['NO2']    ?? null,
+            so2:    s['SO2']    ?? null,
+            co:     s['CO']     ?? null,
+            pm10:   s['PM10']   ?? null,
+            color:  aqiColor(s.aqi)
+          }
+        }))
+      };
     }
 
     // Pre-bake circle color into each feature so MapLibre can use ['get', 'color']
@@ -262,7 +372,7 @@
     // ======================================================
 
     function addSites2DLayer() {
-      map.addSource('sites', { type: 'geojson', data: SITES_DATA });
+      map.addSource('sites', { type: 'geojson', data: yearToGeoJSON(YEARS[currentYearIdx]) });
 
       map.addLayer({
         id: 'sites-2d', type: 'circle', source: 'sites',
@@ -303,13 +413,14 @@
             opacity:      0.9
           });
 
-          const mesh = new THREE.InstancedMesh(geo, mat, SITES_DATA.features.length);
+          const features = yearToGeoJSON(YEARS[currentYearIdx]).features;
+          const mesh = new THREE.InstancedMesh(geo, mat, features.length);
           mesh.frustumCulled = false; // bounding sphere only covers one instance otherwise
 
           const dummy = new THREE.Object3D();
           const color = new THREE.Color();
 
-          SITES_DATA.features.forEach((f, i) => {
+          features.forEach((f, i) => {
             const [lon, lat] = f.geometry.coordinates;
             const aqi        = f.properties.aqi;
             const coord      = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
@@ -448,7 +559,12 @@
         tooltip.style.display = 'block';
         tooltip.style.left    = (e.point.x + 14) + 'px';
         tooltip.style.top     = (e.point.y - 10) + 'px';
-        tooltip.innerHTML     = `<strong>${p.name}</strong><br/>${p.state}${p.aqi != null ? `<br/>AQI: ${p.aqi}` : ''}`;
+        const pollutants = [];
+        if (p.pm25  != null) pollutants.push(`PM2.5: ${(+p.pm25).toFixed(1)} µg/m³`);
+        if (p.ozone != null) pollutants.push(`Ozone: ${(+p.ozone * 1000).toFixed(1)} ppb`);
+        if (p.no2   != null) pollutants.push(`NO₂: ${(+p.no2).toFixed(2)} ppb`);
+        if (p.so2   != null) pollutants.push(`SO₂: ${(+p.so2).toFixed(2)} ppb`);
+        tooltip.innerHTML = `<strong>${p.name || 'Monitor'}</strong><br/><span style="color:#8899ff">${p.state}${p.county ? ', ' + p.county : ''}</span>${p.aqi != null ? `<br/>AQI: <strong>${p.aqi}</strong>` : ''}${pollutants.length ? '<br/>' + pollutants.join('<br/>') : ''}`;
       });
 
       map.on('mouseleave', 'sites-2d', () => {
@@ -460,12 +576,20 @@
       map.on('click', 'sites-2d', (e) => {
         const p = e.features[0]?.properties;
         if (!p) return;
+        const rows = [];
+        if (p.aqi   != null) rows.push(`AQI: <strong>${p.aqi}</strong>`);
+        if (p.pm25  != null) rows.push(`PM2.5: ${(+p.pm25).toFixed(1)} µg/m³`);
+        if (p.ozone != null) rows.push(`Ozone: ${(+p.ozone * 1000).toFixed(1)} ppb`);
+        if (p.no2   != null) rows.push(`NO₂: ${(+p.no2).toFixed(2)} ppb`);
+        if (p.so2   != null) rows.push(`SO₂: ${(+p.so2).toFixed(2)} ppb`);
+        if (p.co    != null) rows.push(`CO: ${(+p.co).toFixed(2)} ppm`);
+        if (p.pm10  != null) rows.push(`PM10: ${(+p.pm10).toFixed(1)} µg/m³`);
         new maplibregl.Popup({ closeButton: true, closeOnClick: true })
           .setLngLat(e.lngLat)
           .setHTML(`
-            <strong style="color:#8899ff">${p.name}</strong><br/>
-            <span style="color:#aaa">${p.state}</span>
-            ${p.aqi != null ? `<br/>AQI: <strong>${p.aqi}</strong>` : ''}
+            <strong style="color:#8899ff">${p.name || 'Monitor'}</strong><br/>
+            <span style="color:#aaa">${p.state}${p.county ? ', ' + p.county : ''}</span>
+            ${rows.length ? '<br/>' + rows.join('<br/>') : ''}
           `)
           .addTo(map);
       });
@@ -499,6 +623,40 @@
 
 
     // ======================================================
+    // YEAR SLIDER
+    // ======================================================
+
+    function setYear(idx) {
+      currentYearIdx = Math.max(0, Math.min(YEARS.length - 1, idx));
+      const year = YEARS[currentYearIdx];
+      document.getElementById('year-display').textContent = year;
+      document.getElementById('year-range').value = currentYearIdx;
+      if (map.getSource('sites')) {
+        map.getSource('sites').setData(yearToGeoJSON(year));
+      }
+      if (is3D && map.getLayer('sites-3d')) {
+        map.removeLayer('sites-3d');
+        threeLayer = buildThreeLayer();
+        map.addLayer(threeLayer);
+      }
+    }
+
+    function initSlider() {
+      const range  = document.getElementById('year-range');
+      const prev   = document.getElementById('year-prev');
+      const next   = document.getElementById('year-next');
+
+      range.max   = YEARS.length - 1;
+      range.value = currentYearIdx;
+      document.getElementById('year-display').textContent = YEARS[currentYearIdx];
+
+      range.addEventListener('input', () => setYear(+range.value));
+      prev.addEventListener('click',  () => setYear(currentYearIdx - 1));
+      next.addEventListener('click',  () => setYear(currentYearIdx + 1));
+    }
+
+
+    // ======================================================
     // BOOT  — wire everything up on map load
     // ======================================================
 
@@ -507,6 +665,7 @@
       addSites2DLayer();
 
       threeLayer = buildThreeLayer();
+      initSlider();
 
       // County lines load lazily when user zooms in
       if (map.getZoom() >= COUNTY_ZOOM) loadCounties();
