@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>US Air Quality Map</title>
+  <title>US Population + Air Quality Map</title>
 
   <!-- ======================================================
        DEPENDENCIES
@@ -14,6 +14,7 @@
   <!-- Embedded as JS var to avoid file:// CORS block -->
   <script src="./data/sites.js"></script>
   <script src="./data/historical.js"></script>
+  <script src="./data/population.js"></script>
 
   <!-- ======================================================
        STYLES
@@ -22,7 +23,29 @@
     /* ----- Base ----- */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; background: #1a1a2e; }
-    #map { width: 100vw; height: 100vh; }
+    #map-shell {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      background: #05070d;
+    }
+    #map, #map-compare {
+      height: 100vh;
+      min-width: 0;
+      flex: 1 1 100%;
+    }
+    #map-compare { display: none; border-left: 1px solid rgba(120, 140, 255, 0.45); }
+    body.split-view #map, body.split-view #map-compare { flex-basis: 50%; }
+    body.split-view #map-compare { display: block; }
+    #wind-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 4;
+      mix-blend-mode: screen;
+    }
 
     /* ----- Tooltip ----- */
     #tooltip {
@@ -42,25 +65,130 @@
       line-height: 1.5;
     }
 
-    /* ----- 2D / 3D Toggle Button ----- */
-    #toggle-btn {
+    /* ----- Map Popups ----- */
+    .maplibregl-popup-content {
+      background: rgba(8, 10, 18, 0.94);
+      color: #d8defe;
+      border: 1px solid rgba(120, 140, 255, 0.38);
+      border-radius: 8px;
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.42);
+      padding: 12px 14px;
+      font: 12px/1.45 system-ui, sans-serif;
+      max-width: 280px;
+    }
+    .maplibregl-popup-tip {
+      border-top-color: rgba(8, 10, 18, 0.94);
+      border-bottom-color: rgba(8, 10, 18, 0.94);
+    }
+    .maplibregl-popup-close-button {
+      color: #d8defe;
+      font-size: 16px;
+      padding: 3px 7px;
+    }
+    .maplibregl-popup-close-button:hover {
+      background: rgba(120, 140, 255, 0.18);
+      color: #fff;
+    }
+
+    /* ----- Info and Layer Controls ----- */
+    #info-panel {
       position: absolute;
       top: 16px;
       left: 16px;
+      width: min(360px, calc(100vw - 32px));
       z-index: 10;
-      background: rgba(10, 10, 40, 0.9);
-      color: #c0caff;
-      border: 1px solid rgba(100, 120, 255, 0.5);
-      padding: 9px 18px;
+      background: rgba(8, 10, 18, 0.88);
+      color: #f4f5ff;
+      border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      backdrop-filter: blur(6px);
-      transition: background 0.2s;
-      letter-spacing: 0.03em;
+      padding: 14px 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.38);
     }
-    #toggle-btn:hover { background: rgba(80, 100, 255, 0.35); }
+    #info-panel h1 {
+      font-size: 17px;
+      line-height: 1.2;
+      font-weight: 750;
+      margin-bottom: 8px;
+    }
+    #info-panel p {
+      color: #b8c0d8;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    #source-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 11px;
+    }
+    #source-links a {
+      color: #d8defe;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(216, 222, 254, 0.35);
+    }
+    #layer-controls {
+      position: absolute;
+      top: 188px;
+      left: 16px;
+      z-index: 10;
+      display: grid;
+      gap: 7px;
+      background: rgba(8, 10, 18, 0.86);
+      color: #d8defe;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 12px;
+      backdrop-filter: blur(8px);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    #layer-controls label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    #compare-slider {
+      position: absolute;
+      bottom: 88px;
+      right: 24px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(10, 10, 35, 0.92);
+      padding: 10px 16px;
+      border-radius: 28px;
+      border: 1px solid rgba(100, 120, 255, 0.45);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      color: #c0caff;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    body.split-view #compare-slider { display: flex; }
+    #compare-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 220px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(100, 120, 255, 0.3);
+      outline: none;
+      cursor: pointer;
+    }
+    #compare-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #8fdfff;
+      border: 2px solid #fff;
+      cursor: pointer;
+    }
 
     /* ----- County Loading Indicator ----- */
     #loading {
@@ -152,13 +280,14 @@
       text-transform: uppercase;
     }
 
-    /* ----- AQI Legend ----- */
+    /* ----- Legends ----- */
     #legend {
       position: absolute;
       bottom: 40px;
       left: 16px;
-      background: rgba(10, 10, 30, 0.85);
-      color: #c0c8ff;
+      width: 250px;
+      background: rgba(8, 10, 18, 0.88);
+      color: #d8defe;
       padding: 10px 14px;
       border-radius: 8px;
       font-size: 12px;
@@ -167,12 +296,39 @@
       z-index: 10;
       line-height: 1.8;
     }
-    #legend .dot {
+    #legend h2 {
+      font-size: 12px;
+      margin: 0 0 6px;
+      color: #fff;
+    }
+    #legend .dot, #legend .swatch {
       display: inline-block;
       width: 10px; height: 10px;
-      border-radius: 50%;
       margin-right: 6px;
       vertical-align: middle;
+    }
+    #legend .dot { border-radius: 50%; }
+    #legend .swatch { border-radius: 2px; }
+    #legend .section {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    #year-note {
+      color: #98a2c6;
+      font-size: 11px;
+      line-height: 1.35;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 720px) {
+      #info-panel { top: 10px; left: 10px; width: calc(100vw - 20px); }
+      #layer-controls { top: 178px; left: 10px; }
+      #legend { left: 10px; bottom: 98px; width: min(250px, calc(100vw - 20px)); }
+      #year-slider { width: calc(100vw - 20px); padding: 10px 12px; }
+      #compare-slider { right: 10px; bottom: 154px; width: calc(100vw - 20px); }
+      #compare-range { width: 100%; }
+      #year-range { width: 100%; }
     }
   </style>
 </head>
@@ -181,9 +337,27 @@
   <!-- ======================================================
        HTML STRUCTURE
   ====================================================== -->
-  <div id="map"></div>
+  <div id="map-shell">
+    <div id="map"></div>
+    <div id="map-compare"></div>
+  </div>
+  <canvas id="wind-canvas"></canvas>
   <div id="tooltip"></div>
-  <button id="toggle-btn">Switch to 3D</button>
+  <section id="info-panel">
+    <h1>United States Population + Air Quality</h1>
+    <p>Census city population estimates are shown as a heatmap. EPA AirData monitor summaries use the AQI color ramp from your legend image. The moving air layer animates every selected year.</p>
+    <div id="source-links">
+      <a href="https://www.census.gov/data/tables/time-series/demo/popest/2020s-total-cities-and-towns.html" target="_blank" rel="noreferrer">Census population</a>
+      <a href="https://www.epa.gov/outdoor-air-quality-data" target="_blank" rel="noreferrer">EPA AirData</a>
+      <a href="https://www.epa.gov/outdoor-air-quality-data/airdata-multiyear-tile-plot" target="_blank" rel="noreferrer">EPA tile plot</a>
+    </div>
+  </section>
+  <div id="layer-controls">
+    <label><input type="checkbox" id="toggle-air" checked /> Air quality</label>
+    <label><input type="checkbox" id="toggle-population" checked /> Population</label>
+    <label><input type="checkbox" id="toggle-wind" checked /> Air / wind</label>
+    <label><input type="checkbox" id="toggle-split" /> Split view</label>
+  </div>
   <div id="loading">Loading county data...</div>
 
   <div id="year-slider">
@@ -193,13 +367,28 @@
     <button class="year-btn" id="year-next">&#8250;</button>
     <div id="year-display">—</div>
   </div>
+  <div id="compare-slider">
+    <span>Compare</span>
+    <input type="range" id="compare-range" min="0" step="1" value="0" />
+    <strong id="compare-display">—</strong>
+  </div>
   <div id="legend">
-    <div><span class="dot" style="background:#00e400"></span>Good (0–50)</div>
-    <div><span class="dot" style="background:#ffff00"></span>Moderate (51–100)</div>
-    <div><span class="dot" style="background:#ff7e00"></span>Unhealthy for Some (101–150)</div>
-    <div><span class="dot" style="background:#ff0000"></span>Unhealthy (151–200)</div>
-    <div><span class="dot" style="background:#8f3f97"></span>Very Unhealthy (201+)</div>
+    <h2>Air Quality Index</h2>
+    <div><span class="dot" style="background:#78FF78"></span>Good (0-50)</div>
+    <div><span class="dot" style="background:#E3B500"></span>Moderate (51-100)</div>
+    <div><span class="dot" style="background:#E07000"></span>Unhealthy for Some (101-150)</div>
+    <div><span class="dot" style="background:#980000"></span>Unhealthy (151-200)</div>
+    <div><span class="dot" style="background:#520029"></span>Very Unhealthy (201-300)</div>
+    <div><span class="dot" style="background:#290000"></span>Hazardous (301+)</div>
     <div><span class="dot" style="background:#607090"></span>No Data</div>
+    <div class="section">
+      <h2>Population Heat</h2>
+      <div><span class="swatch" style="background:#66F7FF"></span>Lowest population</div>
+      <div><span class="swatch" style="background:#1EB7FF"></span>Medium population</div>
+      <div><span class="swatch" style="background:#1266CC"></span>High population</div>
+      <div><span class="swatch" style="background:#061B5B"></span>Highest population</div>
+    </div>
+    <div id="year-note">Population year: Census exact year when available. EPA monitor data uses the local AirData years.</div>
   </div>
 
   <script>
@@ -214,11 +403,62 @@
 
     function aqiColor(aqi) {
       if (aqi == null) return '#607090';
-      if (aqi <= 50)   return '#00e400';
-      if (aqi <= 100)  return '#ffff00';
-      if (aqi <= 150)  return '#ff7e00';
-      if (aqi <= 200)  return '#ff0000';
-      return '#8f3f97';
+      if (aqi <= 50)   return '#78FF78';
+      if (aqi <= 100)  return '#E3B500';
+      if (aqi <= 150)  return '#E07000';
+      if (aqi <= 200)  return '#980000';
+      if (aqi <= 300)  return '#520029';
+      return '#290000';
+    }
+
+    function hasPopulationYear(year) {
+      return POPULATION_YEARS.includes(year);
+    }
+
+    function updatePopulationYearNote(year) {
+      const note = document.getElementById('year-note');
+      if (!note) return;
+      if (hasPopulationYear(year)) {
+        note.textContent = `Population year: Census ${year}, matching the selected year. EPA monitor data uses the local AirData years.`;
+      } else {
+        note.textContent = `Population year: no official Census city/place population data loaded for ${year}. The population layer is hidden for this selected year.`;
+      }
+    }
+
+    function populationColor(population) {
+      if (population > 2900000) return '#061B5B';
+      if (population > 980000)  return '#1266CC';
+      if (population > 520029)  return '#1EB7FF';
+      if (population > 300000)  return '#44E0FF';
+      return '#66F7FF';
+    }
+
+    function populationToGeoJSON(year) {
+      const popYear = hasPopulationYear(year) ? year : null;
+      return {
+        type: 'FeatureCollection',
+        features: popYear == null ? [] : POPULATION_CITIES.map(city => {
+          const population = city.pop[popYear];
+          if (population == null) return null;
+          const previousYear = POPULATION_YEARS.includes(popYear - 1) ? popYear - 1 : null;
+          const previousPopulation = previousYear ? city.pop[previousYear] : null;
+          const change = previousPopulation == null ? null : population - previousPopulation;
+          const changePct = previousPopulation ? change / previousPopulation * 100 : null;
+          return {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [city.lon, city.lat] },
+            properties: {
+              name: city.name,
+              state: city.state,
+              population,
+              change,
+              changePct,
+              popYear,
+              color: populationColor(population)
+            }
+          };
+        }).filter(Boolean)
+      };
     }
 
     function yearToGeoJSON(year) {
@@ -245,6 +485,107 @@
       };
     }
 
+    function average(values) {
+      const nums = values.filter(v => v != null && Number.isFinite(+v)).map(Number);
+      if (!nums.length) return null;
+      return nums.reduce((sum, value) => sum + value, 0) / nums.length;
+    }
+
+    function normalizeName(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function airSummaryFor({ stateName, countyName, year }) {
+      const sites = HISTORICAL_DATA[year] || [];
+      const stateNeedle = normalizeName(stateName);
+      const countyNeedle = normalizeName(countyName);
+      const filtered = sites.filter(site => {
+        const stateMatches = !stateNeedle || normalizeName(site.state) === stateNeedle;
+        const countyMatches = !countyNeedle || normalizeName(site.county) === countyNeedle;
+        return stateMatches && countyMatches;
+      });
+      const pollutants = ['PM2.5', 'Ozone', 'PM10', 'NO2', 'SO2', 'CO'];
+      return {
+        monitorCount: filtered.length,
+        avgAqi: average(filtered.map(site => site.aqi)),
+        maxAqi: filtered.reduce((max, site) => site.aqi != null ? Math.max(max, Number(site.aqi)) : max, 0) || null,
+        pollutantAverages: pollutants.map(name => ({
+          name,
+          value: average(filtered.map(site => site[name]))
+        })).filter(item => item.value != null)
+      };
+    }
+
+    function populationSummaryForState(stateName, year) {
+      if (!hasPopulationYear(year)) return null;
+      const stateNeedle = normalizeName(stateName);
+      const places = POPULATION_CITIES.filter(city => normalizeName(city.stateName) === stateNeedle && city.pop[year] != null);
+      const total = places.reduce((sum, city) => sum + Number(city.pop[year] || 0), 0);
+      const largest = places.slice().sort((a, b) => Number(b.pop[year] || 0) - Number(a.pop[year] || 0))[0] || null;
+      return {
+        placeCount: places.length,
+        total,
+        largest
+      };
+    }
+
+    function formatNumber(value, digits = 0) {
+      if (value == null || !Number.isFinite(+value)) return 'No data';
+      return Number(value).toLocaleString(undefined, {
+        maximumFractionDigits: digits,
+        minimumFractionDigits: digits
+      });
+    }
+
+    function pollutantUnit(name) {
+      if (name === 'PM2.5' || name === 'PM10') return 'ug/m3';
+      if (name === 'Ozone') return 'ppm';
+      if (name === 'CO') return 'ppm';
+      return 'ppb';
+    }
+
+    function buildStatePopupHTML(stateName, year) {
+      const air = airSummaryFor({ stateName, year });
+      const population = populationSummaryForState(stateName, year);
+      const pollutantRows = air.pollutantAverages.slice(0, 4).map(item =>
+        `<div>${item.name}: <strong>${formatNumber(item.value, item.name === 'Ozone' ? 4 : 2)}</strong> ${pollutantUnit(item.name)}</div>`
+      ).join('');
+      const populationHTML = population
+        ? `
+          <div style="margin-top:8px;color:#d8defe">Population (${year})</div>
+          <div>Census places: <strong>${formatNumber(population.placeCount)}</strong></div>
+          <div>Total place population: <strong>${formatNumber(population.total)}</strong></div>
+          ${population.largest ? `<div>Largest place: <strong>${population.largest.name}</strong> (${formatNumber(population.largest.pop[year])})</div>` : ''}
+        `
+        : `<div style="margin-top:8px;color:#d8defe">Population</div><div>No Census place population loaded for ${year}.</div>`;
+      return `
+        <strong style="color:#d8defe">${stateName}</strong><br/>
+        <span style="color:#aaa">Selected year: ${year}</span>
+        <div style="margin-top:8px;color:#d8defe">Air quality</div>
+        <div>Monitors: <strong>${formatNumber(air.monitorCount)}</strong></div>
+        <div>Average AQI: <strong>${formatNumber(air.avgAqi, 1)}</strong></div>
+        <div>Max AQI: <strong>${formatNumber(air.maxAqi)}</strong></div>
+        ${pollutantRows ? `<div style="margin-top:6px">${pollutantRows}</div>` : '<div>No pollutant averages for this year.</div>'}
+        ${populationHTML}
+      `;
+    }
+
+    function buildCountyPopupHTML(countyName, stateName, year) {
+      const air = airSummaryFor({ stateName, countyName, year });
+      const pollutantRows = air.pollutantAverages.slice(0, 4).map(item =>
+        `<div>${item.name}: <strong>${formatNumber(item.value, item.name === 'Ozone' ? 4 : 2)}</strong> ${pollutantUnit(item.name)}</div>`
+      ).join('');
+      return `
+        <strong style="color:#d8defe">${countyName} County</strong><br/>
+        <span style="color:#aaa">${stateName} - ${year}</span>
+        <div style="margin-top:8px;color:#d8defe">Air quality</div>
+        <div>Monitors: <strong>${formatNumber(air.monitorCount)}</strong></div>
+        <div>Average AQI: <strong>${formatNumber(air.avgAqi, 1)}</strong></div>
+        <div>Max AQI: <strong>${formatNumber(air.maxAqi)}</strong></div>
+        ${pollutantRows ? `<div style="margin-top:6px">${pollutantRows}</div>` : '<div>No pollutant averages for this county/year.</div>'}
+      `;
+    }
+
     // Pre-bake circle color into each feature so MapLibre can use ['get', 'color']
     SITES_DATA.features.forEach(f => {
       f.properties.color = aqiColor(f.properties.aqi);
@@ -255,9 +596,39 @@
     // MAP STUFF
     // ======================================================
 
+    function satelliteStyle() {
+      return {
+        version: 8,
+        sources: {
+          satellite: {
+            type: 'raster',
+            tiles: [
+              'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            ],
+            tileSize: 256,
+            attribution: 'Tiles &copy; Esri'
+          }
+        },
+        layers: [
+          {
+            id: 'satellite',
+            type: 'raster',
+            source: 'satellite'
+          },
+          {
+            id: 'satellite-dim',
+            type: 'background',
+            paint: {
+              'background-color': 'rgba(0, 0, 0, 0.58)'
+            }
+          }
+        ]
+      };
+    }
+
     const map = new maplibregl.Map({
       container: 'map',
-      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+      style: satelliteStyle(),
       center: [-98.5, 39.5],
       zoom: 3.8,
       minZoom: 2.5,
@@ -270,12 +641,14 @@
 
     const tooltip   = document.getElementById('tooltip');
     const loadingEl = document.getElementById('loading');
-    const toggleBtn = document.getElementById('toggle-btn');
-
     let countiesLoaded  = false;
     let countiesLoading = false;
-    let is3D            = false;
-    let threeLayer      = null;
+    let hoveredStateId  = null;
+    let hoveredCountyId = null;
+    let compareMap      = null;
+    let compareReady    = false;
+    let compareYearIdx  = currentYearIdx;
+    let syncingMaps     = false;
 
 
     // ======================================================
@@ -387,104 +760,287 @@
       });
     }
 
+    function addPopulationLayer() {
+      map.addSource('population-cities', {
+        type: 'geojson',
+        data: populationToGeoJSON(YEARS[currentYearIdx])
+      });
 
-    // ======================================================
-    // LAYER — COLLECTION SITES 3D 
-    // ======================================================
-
-    function buildThreeLayer() {
-      return {
-        id: 'sites-3d',
-        type: 'custom',
-        renderingMode: '3d',
-
-        onAdd(map, gl) {
-          this.map    = map;
-          this.camera = new THREE.Camera();
-          this.scene  = new THREE.Scene();
-
-          // Cylinder baked to Z-up so +Z aligns with Mercator altitude axis
-          const geo = new THREE.CylinderGeometry(1, 1, 1, 6);
-          geo.rotateX(Math.PI / 2);
-
-          const mat = new THREE.MeshPhongMaterial({
-            vertexColors: true,
-            transparent:  true,
-            opacity:      0.9
-          });
-
-          const features = yearToGeoJSON(YEARS[currentYearIdx]).features;
-          const mesh = new THREE.InstancedMesh(geo, mat, features.length);
-          mesh.frustumCulled = false; // bounding sphere only covers one instance otherwise
-
-          const dummy = new THREE.Object3D();
-          const color = new THREE.Color();
-
-          features.forEach((f, i) => {
-            const [lon, lat] = f.geometry.coordinates;
-            const aqi        = f.properties.aqi;
-            const coord      = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
-            const s          = coord.meterInMercatorCoordinateUnits();
-
-            // Heights in meters — must be large enough to appear at national zoom
-            const heightM = aqi != null ? Math.max(aqi * 2500, 120000) : 150000;
-            const radiusM = 32000;
-
-            dummy.position.set(coord.x, coord.y, heightM * s * 0.5);
-            dummy.scale.set(radiusM * s, radiusM * s, heightM * s);
-            dummy.updateMatrix();
-
-            mesh.setMatrixAt(i, dummy.matrix);
-            color.set(aqiColor(aqi));
-            mesh.setColorAt(i, color);
-          });
-
-          mesh.instanceMatrix.needsUpdate = true;
-          mesh.instanceColor.needsUpdate  = true;
-          this.scene.add(mesh);
-
-          this.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-          const dir = new THREE.DirectionalLight(0xffffff, 1.2);
-          dir.position.set(1, -1, 2).normalize();
-          this.scene.add(dir);
-
-          this.renderer = new THREE.WebGLRenderer({
-            canvas:    map.getCanvas(),
-            context:   gl,
-            antialias: true
-          });
-          this.renderer.autoClear = false;
-        },
-
-        render(gl, args) {
-          const m = new THREE.Matrix4().fromArray(args.defaultProjectionData.mainMatrix);
-          this.camera.projectionMatrix = m;
-          this.renderer.resetState();
-          this.renderer.render(this.scene, this.camera);
-          this.map.triggerRepaint();
+      map.addLayer({
+        id: 'population-heat',
+        type: 'heatmap',
+        source: 'population-cities',
+        maxzoom: 8,
+        paint: {
+          'heatmap-weight': [
+            'interpolate',
+            ['linear'],
+            ['get', 'population'],
+            0,
+            0,
+            300000,
+            0.08,
+            980000,
+            0.35,
+            2900000,
+            0.7,
+            9000000,
+            1
+          ],
+          'heatmap-intensity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            2,
+            0.55,
+            6,
+            1.9,
+            8,
+            2.8
+          ],
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0,
+            'rgba(102, 247, 255, 0)',
+            0.22,
+            'rgba(102, 247, 255, 0.50)',
+            0.45,
+            'rgba(30, 183, 255, 0.70)',
+            0.72,
+            'rgba(18, 102, 204, 0.84)',
+            1,
+            'rgba(6, 27, 91, 0.96)'
+          ],
+          'heatmap-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            2,
+            10,
+            5,
+            32,
+            8,
+            58
+          ],
+          'heatmap-opacity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            2,
+            0.82,
+            7,
+            0.62,
+            8,
+            0.18
+          ]
         }
-      };
+      }, 'sites-2d');
+
+      map.addLayer({
+        id: 'population-point',
+        type: 'circle',
+        source: 'population-cities',
+        paint: {
+          'circle-color': '#f4f5ff',
+          'circle-radius': ['interpolate', ['sqrt'], ['get', 'population'], 300000, 3, 9000000, 12],
+          'circle-opacity': ['interpolate', ['linear'], ['zoom'], 3, 0.02, 6, 0.36, 8, 0.72],
+          'circle-stroke-color': '#080a12',
+          'circle-stroke-width': 0.8,
+          'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 3, 0, 6, 0.42]
+        }
+      }, 'sites-2d');
+
+      map.addLayer({
+        id: 'population-label',
+        type: 'symbol',
+        source: 'population-cities',
+        minzoom: 5,
+        filter: ['>=', ['get', 'population'], 100000],
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 4, 9, 8, 12],
+          'text-offset': [0, 1.25],
+          'text-anchor': 'top',
+          'text-allow-overlap': false
+        },
+        paint: {
+          'text-color': '#f4f5ff',
+          'text-halo-color': '#080a12',
+          'text-halo-width': 1.4
+        }
+      });
     }
 
+    async function addCompareStatesLayer(targetMap) {
+      const geojson = await fetch(
+        'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
+      ).then(r => r.json());
 
-    // ======================================================
-    // 2D / 3D TOGGLE
-    // ======================================================
+      targetMap.addSource('states', { type: 'geojson', data: geojson });
+      targetMap.addLayer({
+        id: 'states-fill',
+        type: 'fill',
+        source: 'states',
+        paint: {
+          'fill-color': '#2a3060',
+          'fill-opacity': 0.35
+        }
+      });
+      targetMap.addLayer({
+        id: 'states-border',
+        type: 'line',
+        source: 'states',
+        paint: {
+          'line-color': '#7788ff',
+          'line-width': 1,
+          'line-opacity': 0.85
+        }
+      });
+      targetMap.addLayer({
+        id: 'states-label',
+        type: 'symbol',
+        source: 'states',
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 3, 8, 6, 13],
+          'text-anchor': 'center',
+          'text-allow-overlap': false
+        },
+        paint: {
+          'text-color': '#c0caff',
+          'text-halo-color': '#0a0a1e',
+          'text-halo-width': 1.5
+        }
+      });
+    }
 
-    toggleBtn.addEventListener('click', () => {
-      is3D = !is3D;
-      toggleBtn.textContent = is3D ? 'Switch to 2D' : 'Switch to 3D';
+    function addCompareDataLayers(targetMap, year) {
+      targetMap.addSource('population-cities', {
+        type: 'geojson',
+        data: populationToGeoJSON(year)
+      });
+      targetMap.addLayer({
+        id: 'population-heat',
+        type: 'heatmap',
+        source: 'population-cities',
+        maxzoom: 8,
+        paint: {
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'population'], 0, 0, 300000, 0.08, 980000, 0.35, 2900000, 0.7, 9000000, 1],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 2, 0.55, 6, 1.9, 8, 2.8],
+          'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(102, 247, 255, 0)', 0.22, 'rgba(102, 247, 255, 0.50)', 0.45, 'rgba(30, 183, 255, 0.70)', 0.72, 'rgba(18, 102, 204, 0.84)', 1, 'rgba(6, 27, 91, 0.96)'],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 2, 10, 5, 32, 8, 58],
+          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.82, 7, 0.62, 8, 0.18]
+        }
+      }, 'states-label');
 
-      if (is3D) {
-        map.setLayoutProperty('sites-2d', 'visibility', 'none');
-        if (!map.getLayer('sites-3d')) map.addLayer(threeLayer);
-        map.easeTo({ pitch: 55, bearing: -20, duration: 900 });
-      } else {
-        if (map.getLayer('sites-3d')) map.removeLayer('sites-3d');
-        map.setLayoutProperty('sites-2d', 'visibility', 'visible');
-        map.easeTo({ pitch: 0, bearing: 0, duration: 900 });
+      targetMap.addSource('sites', { type: 'geojson', data: yearToGeoJSON(year) });
+      targetMap.addLayer({
+        id: 'sites-2d',
+        type: 'circle',
+        source: 'sites',
+        paint: {
+          'circle-color': ['get', 'color'],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 7],
+          'circle-opacity': 0.85,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 0.5,
+          'circle-stroke-opacity': 0.4
+        }
+      });
+
+      setCompareLayerVisibility();
+    }
+
+    function setCompareLayerVisibility() {
+      if (!compareReady || !compareMap) return;
+      const airVisible = document.getElementById('toggle-air').checked;
+      const populationVisible = document.getElementById('toggle-population').checked && hasPopulationYear(YEARS[compareYearIdx]);
+      if (compareMap.getLayer('sites-2d')) {
+        compareMap.setLayoutProperty('sites-2d', 'visibility', airVisible ? 'visible' : 'none');
       }
-    });
+      if (compareMap.getLayer('population-heat')) {
+        compareMap.setLayoutProperty('population-heat', 'visibility', populationVisible ? 'visible' : 'none');
+      }
+    }
+
+    function updateCompareYear(idx) {
+      compareYearIdx = Math.max(0, Math.min(YEARS.length - 1, idx));
+      const year = YEARS[compareYearIdx];
+      document.getElementById('compare-range').value = compareYearIdx;
+      document.getElementById('compare-display').textContent = year;
+      if (!compareReady || !compareMap) return;
+      if (compareMap.getSource('sites')) compareMap.getSource('sites').setData(yearToGeoJSON(year));
+      if (compareMap.getSource('population-cities')) compareMap.getSource('population-cities').setData(populationToGeoJSON(year));
+      setCompareLayerVisibility();
+    }
+
+    function syncMapPair(source, target) {
+      if (syncingMaps || !target) return;
+      syncingMaps = true;
+      target.jumpTo({
+        center: source.getCenter(),
+        zoom: source.getZoom(),
+        bearing: source.getBearing(),
+        pitch: source.getPitch()
+      });
+      syncingMaps = false;
+    }
+
+    function initCompareMap() {
+      if (compareMap) return;
+      compareMap = new maplibregl.Map({
+        container: 'map-compare',
+        style: satelliteStyle(),
+        center: map.getCenter(),
+        zoom: map.getZoom(),
+        minZoom: 2.5,
+        maxZoom: 12,
+        maxBounds: [[-180, 10], [-50, 75]]
+      });
+      compareMap.addControl(new maplibregl.NavigationControl(), 'top-right');
+      compareMap.on('load', async () => {
+        await addCompareStatesLayer(compareMap);
+        addCompareDataLayers(compareMap, YEARS[compareYearIdx]);
+        compareReady = true;
+        updateCompareYear(compareYearIdx);
+        compareMap.on('move', () => syncMapPair(compareMap, map));
+      });
+      map.on('move', () => syncMapPair(map, compareMap));
+    }
+
+    function setSplitView(enabled) {
+      document.body.classList.toggle('split-view', enabled);
+      if (enabled) initCompareMap();
+      requestAnimationFrame(() => {
+        map.resize();
+        if (compareMap) compareMap.resize();
+      });
+    }
+
+    function clearMapHoverState() {
+      if (hoveredStateId !== null && map.getSource('states')) {
+        map.setFeatureState({ source: 'states', id: hoveredStateId }, { hover: false });
+        hoveredStateId = null;
+      }
+      if (hoveredCountyId !== null && map.getSource('counties')) {
+        map.setFeatureState({ source: 'counties', id: hoveredCountyId }, { hover: false });
+        hoveredCountyId = null;
+      }
+      map.getCanvas().style.cursor = '';
+      tooltip.style.display = 'none';
+    }
+
+    function setPopulationVisibilityForYear(year) {
+      const showPopulation =
+        hasPopulationYear(year) && document.getElementById('toggle-population').checked;
+      setLayerVisibility('population-heat', showPopulation);
+      setLayerVisibility('population-point', showPopulation);
+      setLayerVisibility('population-label', showPopulation);
+    }
 
 
     // ======================================================
@@ -492,9 +1048,6 @@
     // ======================================================
 
     function setupInteractions() {
-      let hoveredStateId  = null;
-      let hoveredCountyId = null;
-
       function clearStateHover() {
         if (hoveredStateId !== null) {
           map.setFeatureState({ source: 'states', id: hoveredStateId }, { hover: false });
@@ -572,6 +1125,25 @@
         tooltip.style.display = 'none';
       });
 
+      // ----- Population heatmap hover -----
+      map.on('mousemove', 'population-point', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const p = e.features[0]?.properties;
+        if (!p) return;
+        tooltip.style.display = 'block';
+        tooltip.style.left    = (e.point.x + 14) + 'px';
+        tooltip.style.top     = (e.point.y - 10) + 'px';
+        const changeText = p.change == null
+          ? ''
+          : `<br/><span style="color:#8fdfff">Change from ${Number(p.popYear) - 1}: ${Number(p.change).toLocaleString()} (${Number(p.changePct).toFixed(2)}%)</span>`;
+        tooltip.innerHTML = `<strong>${p.name}, ${p.state}</strong><br/><span style="color:#b8c0d8">Population ${p.popYear}: ${Number(p.population).toLocaleString()}</span>${changeText}`;
+      });
+
+      map.on('mouseleave', 'population-point', () => {
+        map.getCanvas().style.cursor = '';
+        tooltip.style.display = 'none';
+      });
+
       // ----- Site marker click -----
       map.on('click', 'sites-2d', (e) => {
         const p = e.features[0]?.properties;
@@ -594,20 +1166,33 @@
           .addTo(map);
       });
 
+      map.on('click', 'population-point', (e) => {
+        const p = e.features[0]?.properties;
+        if (!p) return;
+        new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+          .setLngLat(e.lngLat)
+          .setHTML(`
+            <strong style="color:#d8defe">${p.name}, ${p.state}</strong><br/>
+            Population ${p.popYear}: <strong>${Number(p.population).toLocaleString()}</strong>
+            ${p.change == null ? '' : `<br/>Change from ${Number(p.popYear) - 1}: <strong>${Number(p.change).toLocaleString()}</strong> (${Number(p.changePct).toFixed(2)}%)`}
+          `)
+          .addTo(map);
+      });
+
       // ----- State / County click -----
       map.on('click', 'states-fill', (e) => {
         // Let site clicks take priority
         if (map.queryRenderedFeatures(e.point, { layers: ['sites-2d'] }).length) return;
+        if (map.queryRenderedFeatures(e.point, { layers: ['population-point'] }).length) return;
 
         if (countiesLoaded && map.getZoom() >= COUNTY_ZOOM) {
           const [county] = map.queryRenderedFeatures(e.point, { layers: ['counties-fill'] });
           if (county) {
+            const stateName = e.features[0]?.properties?.name ?? '';
+            const countyName = county.properties.NAME || '';
             new maplibregl.Popup({ closeButton: true, closeOnClick: true })
               .setLngLat(e.lngLat)
-              .setHTML(`
-                <strong style="color:#8899ff">${county.properties.NAME} County</strong><br/>
-                <span style="color:#aaa">${e.features[0]?.properties?.name ?? ''}</span>
-              `)
+              .setHTML(buildCountyPopupHTML(countyName, stateName, YEARS[currentYearIdx]))
               .addTo(map);
           }
         } else {
@@ -615,10 +1200,137 @@
           if (!name) return;
           new maplibregl.Popup({ closeButton: true, closeOnClick: true })
             .setLngLat(e.lngLat)
-            .setHTML(`<strong style="color:#8899ff">${name}</strong>`)
+            .setHTML(buildStatePopupHTML(name, YEARS[currentYearIdx]))
             .addTo(map);
         }
       });
+    }
+
+
+    // ======================================================
+    // LAYER CONTROLS
+    // ======================================================
+
+    function setLayerVisibility(layerId, visible) {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+      }
+    }
+
+    function initLayerControls() {
+      const airToggle = document.getElementById('toggle-air');
+      const populationToggle = document.getElementById('toggle-population');
+      const windToggle = document.getElementById('toggle-wind');
+      const splitToggle = document.getElementById('toggle-split');
+
+      airToggle.addEventListener('change', () => {
+        setLayerVisibility('sites-2d', airToggle.checked);
+        setCompareLayerVisibility();
+      });
+
+      populationToggle.addEventListener('change', () => {
+        setPopulationVisibilityForYear(YEARS[currentYearIdx]);
+        setCompareLayerVisibility();
+      });
+
+      windToggle.addEventListener('change', () => {
+        document.getElementById('wind-canvas').style.display = windToggle.checked ? 'block' : 'none';
+      });
+
+      splitToggle.addEventListener('change', () => setSplitView(splitToggle.checked));
+    }
+
+
+    // ======================================================
+    // AIR / WIND ANIMATION
+    // ======================================================
+
+    const windCanvas = document.getElementById('wind-canvas');
+    const windCtx = windCanvas.getContext('2d');
+    let windParticles = [];
+    let windYear = YEARS[currentYearIdx] || 2024;
+    let windFrame = null;
+
+    function resizeWindCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      windCanvas.width = Math.floor(window.innerWidth * dpr);
+      windCanvas.height = Math.floor(window.innerHeight * dpr);
+      windCanvas.style.width = window.innerWidth + 'px';
+      windCanvas.style.height = window.innerHeight + 'px';
+      windCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      seedWindParticles();
+    }
+
+    function seedWindParticles() {
+      const count = Math.round(Math.min(900, Math.max(280, window.innerWidth * window.innerHeight / 1800)));
+      windParticles = Array.from({ length: count }, () => ({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        age: Math.random() * 120,
+        speed: 0.45 + Math.random() * 1.4
+      }));
+    }
+
+    function updateWindForYear(year) {
+      windYear = year;
+      windCanvas.style.opacity = String(0.42 + ((year % 5) * 0.055));
+    }
+
+    function windVector(x, y, time) {
+      const yearPhase = (windYear - 2000) * 0.19;
+      const nx = x / Math.max(window.innerWidth, 1);
+      const ny = y / Math.max(window.innerHeight, 1);
+      const angle =
+        Math.sin(nx * 7.5 + time * 0.00042 + yearPhase) * 1.2 +
+        Math.cos(ny * 6.5 - time * 0.00036 + yearPhase * 0.7) * 0.85 -
+        0.35;
+      const magnitude = 0.62 + Math.sin((nx + ny) * 5 + yearPhase) * 0.22;
+      return {
+        x: Math.cos(angle) * magnitude,
+        y: Math.sin(angle) * magnitude
+      };
+    }
+
+    function drawWind(time) {
+      windCtx.fillStyle = 'rgba(8, 10, 18, 0.075)';
+      windCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+      windCtx.lineWidth = 1;
+      windCtx.strokeStyle = 'rgba(184, 210, 255, 0.34)';
+
+      for (const particle of windParticles) {
+        const v = windVector(particle.x, particle.y, time);
+        const prevX = particle.x;
+        const prevY = particle.y;
+        particle.x += v.x * particle.speed;
+        particle.y += v.y * particle.speed;
+        particle.age += 1;
+
+        windCtx.beginPath();
+        windCtx.moveTo(prevX, prevY);
+        windCtx.lineTo(particle.x, particle.y);
+        windCtx.stroke();
+
+        if (
+          particle.x < -20 || particle.x > window.innerWidth + 20 ||
+          particle.y < -20 || particle.y > window.innerHeight + 20 ||
+          particle.age > 160
+        ) {
+          particle.x = Math.random() * window.innerWidth;
+          particle.y = Math.random() * window.innerHeight;
+          particle.age = 0;
+          particle.speed = 0.45 + Math.random() * 1.4;
+        }
+      }
+
+      windFrame = requestAnimationFrame(drawWind);
+    }
+
+    function initWindAnimation() {
+      resizeWindCanvas();
+      updateWindForYear(YEARS[currentYearIdx]);
+      window.addEventListener('resize', resizeWindCanvas);
+      if (windFrame) cancelAnimationFrame(windFrame);
+      windFrame = requestAnimationFrame(drawWind);
     }
 
 
@@ -629,30 +1341,40 @@
     function setYear(idx) {
       currentYearIdx = Math.max(0, Math.min(YEARS.length - 1, idx));
       const year = YEARS[currentYearIdx];
+      clearMapHoverState();
+      document.querySelectorAll('.maplibregl-popup').forEach(popup => popup.remove());
       document.getElementById('year-display').textContent = year;
       document.getElementById('year-range').value = currentYearIdx;
       if (map.getSource('sites')) {
         map.getSource('sites').setData(yearToGeoJSON(year));
       }
-      if (is3D && map.getLayer('sites-3d')) {
-        map.removeLayer('sites-3d');
-        threeLayer = buildThreeLayer();
-        map.addLayer(threeLayer);
+      if (map.getSource('population-cities')) {
+        map.getSource('population-cities').setData(populationToGeoJSON(year));
       }
+      setPopulationVisibilityForYear(year);
+      updatePopulationYearNote(year);
+      updateWindForYear(year);
     }
 
     function initSlider() {
       const range  = document.getElementById('year-range');
       const prev   = document.getElementById('year-prev');
       const next   = document.getElementById('year-next');
+      const compareRange = document.getElementById('compare-range');
 
       range.max   = YEARS.length - 1;
       range.value = currentYearIdx;
+      compareRange.max = YEARS.length - 1;
+      compareRange.value = compareYearIdx;
       document.getElementById('year-display').textContent = YEARS[currentYearIdx];
+      document.getElementById('compare-display').textContent = YEARS[compareYearIdx];
+      setPopulationVisibilityForYear(YEARS[currentYearIdx]);
+      updatePopulationYearNote(YEARS[currentYearIdx]);
 
       range.addEventListener('input', () => setYear(+range.value));
       prev.addEventListener('click',  () => setYear(currentYearIdx - 1));
       next.addEventListener('click',  () => setYear(currentYearIdx + 1));
+      compareRange.addEventListener('input', () => updateCompareYear(+compareRange.value));
     }
 
 
@@ -663,9 +1385,11 @@
     map.on('load', async () => {
       await addStatesLayer();
       addSites2DLayer();
+      addPopulationLayer();
 
-      threeLayer = buildThreeLayer();
       initSlider();
+      initLayerControls();
+      initWindAnimation();
 
       // County lines load lazily when user zooms in
       if (map.getZoom() >= COUNTY_ZOOM) loadCounties();
