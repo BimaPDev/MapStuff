@@ -22,7 +22,7 @@
   <style>
     /* ----- Base ----- */
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; background: #1a1a2e; }
+    body { font-family: system-ui, sans-serif; background: #1a1a1a; }
     #map-shell {
       width: 100vw;
       height: 100vh;
@@ -34,7 +34,7 @@
       min-width: 0;
       flex: 1 1 100%;
     }
-    #map-compare { display: none; border-left: 1px solid rgba(120, 140, 255, 0.45); }
+    #map-compare { display: none; border-left: 1px solid rgba(140, 140, 140, 0.45); }
     body.split-view #map, body.split-view #map-compare { flex-basis: 50%; }
     body.split-view #map-compare { display: block; }
     #wind-canvas {
@@ -46,19 +46,30 @@
       z-index: 4;
       mix-blend-mode: screen;
     }
+    #map, #map-compare { position: relative; }
+    .aqi-overlay-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+      opacity: 0.72;
+      display: none;
+    }
 
     /* ----- Tooltip ----- */
     #tooltip {
       position: absolute;
       background: rgba(10, 10, 30, 0.92);
-      color: #e0e0ff;
+      color: #e0e0e0;
       padding: 8px 14px;
       border-radius: 6px;
       font-size: 13px;
       font-weight: 600;
       pointer-events: none;
       display: none;
-      border: 1px solid rgba(100, 120, 255, 0.4);
+      border: 1px solid rgba(140, 140, 140, 0.4);
       backdrop-filter: blur(4px);
       z-index: 10;
       max-width: 200px;
@@ -68,8 +79,8 @@
     /* ----- Map Popups ----- */
     .maplibregl-popup-content {
       background: rgba(8, 10, 18, 0.94);
-      color: #d8defe;
-      border: 1px solid rgba(120, 140, 255, 0.38);
+      color: #d8d8d8;
+      border: 1px solid rgba(140, 140, 140, 0.38);
       border-radius: 8px;
       box-shadow: 0 16px 38px rgba(0, 0, 0, 0.42);
       padding: 12px 14px;
@@ -86,7 +97,7 @@
       padding: 3px 7px;
     }
     .maplibregl-popup-close-button:hover {
-      background: rgba(120, 140, 255, 0.18);
+      background: rgba(140, 140, 140, 0.18);
       color: #fff;
     }
 
@@ -98,7 +109,7 @@
       width: min(360px, calc(100vw - 32px));
       z-index: 10;
       background: rgba(8, 10, 18, 0.88);
-      color: #f4f5ff;
+      color: #f4f4f4;
       border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 8px;
       padding: 14px 16px;
@@ -112,7 +123,7 @@
       margin-bottom: 8px;
     }
     #info-panel p {
-      color: #b8c0d8;
+      color: #b8b8b8;
       font-size: 12px;
       line-height: 1.45;
     }
@@ -124,9 +135,9 @@
       font-size: 11px;
     }
     #source-links a {
-      color: #d8defe;
+      color: #d8d8d8;
       text-decoration: none;
-      border-bottom: 1px solid rgba(216, 222, 254, 0.35);
+      border-bottom: 1px solid rgba(216, 216, 216, 0.35);
     }
     #layer-controls {
       position: absolute;
@@ -136,7 +147,7 @@
       display: grid;
       gap: 7px;
       background: rgba(8, 10, 18, 0.86);
-      color: #d8defe;
+      color: #d8d8d8;
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 8px;
       padding: 10px 12px;
@@ -160,22 +171,53 @@
       background: rgba(10, 10, 35, 0.92);
       padding: 10px 16px;
       border-radius: 28px;
-      border: 1px solid rgba(100, 120, 255, 0.45);
+      border: 1px solid rgba(140, 140, 140, 0.45);
       backdrop-filter: blur(8px);
       z-index: 10;
-      color: #c0caff;
+      color: #c0c0c0;
       font-size: 12px;
       font-weight: 700;
       white-space: nowrap;
     }
     body.split-view #compare-slider { display: flex; }
+    body.split-view #compare-slider {
+      top: 16px;
+      right: 64px;
+      bottom: auto;
+      width: min(420px, calc(50vw - 96px));
+      max-width: calc(50vw - 96px);
+    }
+    #compare-range { width: 100%; min-width: 0; }
+    #split-controls {
+      position: absolute;
+      top: 66px;
+      right: 64px;
+      z-index: 10;
+      display: none;
+      gap: 7px;
+      background: rgba(8, 10, 18, 0.86);
+      color: #d8d8d8;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 12px;
+      backdrop-filter: blur(8px);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    #split-controls label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    body.split-view #split-controls { display: grid; }
     #compare-range {
       -webkit-appearance: none;
       appearance: none;
       width: 220px;
       height: 4px;
       border-radius: 2px;
-      background: rgba(100, 120, 255, 0.3);
+      background: rgba(140, 140, 140, 0.3);
       outline: none;
       cursor: pointer;
     }
@@ -185,7 +227,7 @@
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: #8fdfff;
+      background: #c0c0c0;
       border: 2px solid #fff;
       cursor: pointer;
     }
@@ -197,11 +239,11 @@
       left: 50%;
       transform: translateX(-50%);
       background: rgba(10, 10, 30, 0.9);
-      color: #8899ff;
+      color: #aaaaaa;
       padding: 8px 18px;
       border-radius: 20px;
       font-size: 13px;
-      border: 1px solid rgba(100, 120, 255, 0.4);
+      border: 1px solid rgba(140, 140, 140, 0.4);
       display: none;
       z-index: 10;
     }
@@ -218,7 +260,7 @@
       background: rgba(10, 10, 35, 0.92);
       padding: 10px 22px;
       border-radius: 32px;
-      border: 1px solid rgba(100, 120, 255, 0.45);
+      border: 1px solid rgba(140, 140, 140, 0.45);
       backdrop-filter: blur(8px);
       z-index: 10;
       white-space: nowrap;
@@ -226,7 +268,7 @@
     #year-display {
       font-size: 20px;
       font-weight: 700;
-      color: #c0caff;
+      color: #c0c0c0;
       min-width: 52px;
       text-align: center;
       letter-spacing: 0.04em;
@@ -237,7 +279,7 @@
       width: 280px;
       height: 4px;
       border-radius: 2px;
-      background: rgba(100, 120, 255, 0.3);
+      background: rgba(140, 140, 140, 0.3);
       outline: none;
       cursor: pointer;
     }
@@ -247,24 +289,24 @@
       width: 18px;
       height: 18px;
       border-radius: 50%;
-      background: #7788ff;
+      background: #aaaaaa;
       border: 2px solid #fff;
-      box-shadow: 0 0 6px rgba(100, 120, 255, 0.8);
+      box-shadow: 0 0 6px rgba(140, 140, 140, 0.8);
       cursor: pointer;
     }
     #year-range::-moz-range-thumb {
       width: 18px;
       height: 18px;
       border-radius: 50%;
-      background: #7788ff;
+      background: #aaaaaa;
       border: 2px solid #fff;
-      box-shadow: 0 0 6px rgba(100, 120, 255, 0.8);
+      box-shadow: 0 0 6px rgba(140, 140, 140, 0.8);
       cursor: pointer;
     }
     .year-btn {
       background: none;
       border: none;
-      color: #8899ff;
+      color: #aaaaaa;
       font-size: 22px;
       cursor: pointer;
       line-height: 1;
@@ -274,7 +316,7 @@
     .year-btn:hover { color: #fff; }
     #year-label {
       font-size: 11px;
-      color: #6677aa;
+      color: #777777;
       text-align: center;
       letter-spacing: 0.05em;
       text-transform: uppercase;
@@ -284,14 +326,14 @@
     #legend {
       position: absolute;
       bottom: 40px;
-      left: 16px;
+      right: 16px;
       width: 250px;
       background: rgba(8, 10, 18, 0.88);
-      color: #d8defe;
+      color: #d8d8d8;
       padding: 10px 14px;
       border-radius: 8px;
       font-size: 12px;
-      border: 1px solid rgba(100, 120, 255, 0.3);
+      border: 1px solid rgba(140, 140, 140, 0.3);
       backdrop-filter: blur(6px);
       z-index: 10;
       line-height: 1.8;
@@ -315,7 +357,7 @@
       border-top: 1px solid rgba(255, 255, 255, 0.12);
     }
     #year-note {
-      color: #98a2c6;
+      color: #989898;
       font-size: 11px;
       line-height: 1.35;
       margin-top: 8px;
@@ -324,7 +366,7 @@
     @media (max-width: 720px) {
       #info-panel { top: 10px; left: 10px; width: calc(100vw - 20px); }
       #layer-controls { top: 178px; left: 10px; }
-      #legend { left: 10px; bottom: 98px; width: min(250px, calc(100vw - 20px)); }
+      #legend { right: 10px; bottom: 98px; width: min(250px, calc(100vw - 20px)); }
       #year-slider { width: calc(100vw - 20px); padding: 10px 12px; }
       #compare-slider { right: 10px; bottom: 154px; width: calc(100vw - 20px); }
       #compare-range { width: 100%; }
@@ -338,8 +380,12 @@
        HTML STRUCTURE
   ====================================================== -->
   <div id="map-shell">
-    <div id="map"></div>
-    <div id="map-compare"></div>
+    <div id="map">
+      <canvas class="aqi-overlay-canvas" id="weather-canvas-main"></canvas>
+    </div>
+    <div id="map-compare">
+      <canvas class="aqi-overlay-canvas" id="weather-canvas-compare"></canvas>
+    </div>
   </div>
   <canvas id="wind-canvas"></canvas>
   <div id="tooltip"></div>
@@ -353,9 +399,12 @@
     </div>
   </section>
   <div id="layer-controls">
-    <label><input type="checkbox" id="toggle-air" checked /> Air quality</label>
+    <label><input type="checkbox" id="toggle-air" checked /> AQI Stations</label>
     <label><input type="checkbox" id="toggle-population" checked /> Population</label>
     <label><input type="checkbox" id="toggle-wind" checked /> Air / wind</label>
+    <label><input type="checkbox" id="toggle-weather-overlay" /> AQI Overlay</label>
+    <label><input type="checkbox" id="toggle-aqi-choropleth" /> State AQI</label>
+    <label><input type="checkbox" id="toggle-density-choropleth" /> State Density</label>
     <label><input type="checkbox" id="toggle-split" /> Split view</label>
   </div>
   <div id="loading">Loading county data...</div>
@@ -371,6 +420,14 @@
     <span>Compare</span>
     <input type="range" id="compare-range" min="0" step="1" value="0" />
     <strong id="compare-display">—</strong>
+  </div>
+  <div id="split-controls">
+    <label><input type="checkbox" id="toggle-compare-air" checked /> AQI Stations</label>
+    <label><input type="checkbox" id="toggle-compare-population" checked /> Population</label>
+    <label><input type="checkbox" id="toggle-compare-wind" checked /> Air / wind (shared)</label>
+    <label><input type="checkbox" id="toggle-compare-weather-overlay" /> AQI Overlay</label>
+    <label><input type="checkbox" id="toggle-compare-aqi-choropleth" /> State AQI</label>
+    <label><input type="checkbox" id="toggle-compare-density-choropleth" /> State Density</label>
   </div>
   <div id="legend">
     <h2>Air Quality Index</h2>
@@ -388,6 +445,14 @@
       <div><span class="swatch" style="background:#1266CC"></span>High population</div>
       <div><span class="swatch" style="background:#061B5B"></span>Highest population</div>
     </div>
+    <div id="legend-density" class="section" style="display:none">
+      <h2>State Density (per mi²)</h2>
+      <div><span class="swatch" style="background:#e0e0d8"></span>&lt; 10 (sparse)</div>
+      <div><span class="swatch" style="background:#c8c8c0"></span>10 – 50</div>
+      <div><span class="swatch" style="background:#a0a098"></span>50 – 150</div>
+      <div><span class="swatch" style="background:#787870"></span>150 – 400</div>
+      <div><span class="swatch" style="background:#484840"></span>400+ (dense)</div>
+    </div>
     <div id="year-note">Population year: Census exact year when available. EPA monitor data uses the local AirData years.</div>
   </div>
 
@@ -395,6 +460,39 @@
     // ======================================================
     // CONSTANTS & HELPERS
     // ======================================================
+
+    const STATE_LAND_AREA = {
+      'Alabama':50645,'Alaska':571951,'Arizona':113594,'Arkansas':52035,
+      'California':155779,'Colorado':103642,'Connecticut':4842,'Delaware':1949,
+      'Florida':53625,'Georgia':57513,'Hawaii':6423,'Idaho':82643,
+      'Illinois':55519,'Indiana':35826,'Iowa':55857,'Kansas':81759,
+      'Kentucky':39486,'Louisiana':43204,'Maine':30843,'Maryland':9707,
+      'Massachusetts':7800,'Michigan':56804,'Minnesota':79627,'Mississippi':46923,
+      'Missouri':68742,'Montana':145546,'Nebraska':76824,'Nevada':109781,
+      'New Hampshire':8953,'New Jersey':7354,'New Mexico':121298,'New York':47126,
+      'North Carolina':48618,'North Dakota':68976,'Ohio':40861,'Oklahoma':68595,
+      'Oregon':95988,'Pennsylvania':44743,'Rhode Island':1034,'South Carolina':30061,
+      'South Dakota':75811,'Tennessee':41235,'Texas':261232,'Utah':82170,
+      'Vermont':9217,'Virginia':39490,'Washington':66456,'West Virginia':24038,
+      'Wisconsin':54158,'Wyoming':97093,'District of Columbia':61
+    };
+
+    const FIPS_TO_STATE = {
+      '01':'Alabama','02':'Alaska','04':'Arizona','05':'Arkansas',
+      '06':'California','08':'Colorado','09':'Connecticut','10':'Delaware',
+      '11':'District of Columbia','12':'Florida','13':'Georgia',
+      '15':'Hawaii','16':'Idaho','17':'Illinois','18':'Indiana',
+      '19':'Iowa','20':'Kansas','21':'Kentucky','22':'Louisiana',
+      '23':'Maine','24':'Maryland','25':'Massachusetts','26':'Michigan',
+      '27':'Minnesota','28':'Mississippi','29':'Missouri','30':'Montana',
+      '31':'Nebraska','32':'Nevada','33':'New Hampshire','34':'New Jersey',
+      '35':'New Mexico','36':'New York','37':'North Carolina','38':'North Dakota',
+      '39':'Ohio','40':'Oklahoma','41':'Oregon','42':'Pennsylvania',
+      '44':'Rhode Island','45':'South Carolina','46':'South Dakota',
+      '47':'Tennessee','48':'Texas','49':'Utah','50':'Vermont',
+      '51':'Virginia','53':'Washington','54':'West Virginia',
+      '55':'Wisconsin','56':'Wyoming'
+    };
 
     const COUNTY_ZOOM = 5;
 
@@ -537,6 +635,18 @@
       });
     }
 
+    function hexToRgb(hex) {
+      return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+    }
+
+    function densityColor(density) {
+      if (density > 400) return '#484840';
+      if (density > 150) return '#787870';
+      if (density > 50)  return '#a0a098';
+      if (density > 10)  return '#c8c8c0';
+      return '#e0e0d8';
+    }
+
     function pollutantUnit(name) {
       if (name === 'PM2.5' || name === 'PM10') return 'ug/m3';
       if (name === 'Ozone') return 'ppm';
@@ -552,16 +662,16 @@
       ).join('');
       const populationHTML = population
         ? `
-          <div style="margin-top:8px;color:#d8defe">Population (${year})</div>
+          <div style="margin-top:8px;color:#d8d8d8">Population (${year})</div>
           <div>Census places: <strong>${formatNumber(population.placeCount)}</strong></div>
           <div>Total place population: <strong>${formatNumber(population.total)}</strong></div>
           ${population.largest ? `<div>Largest place: <strong>${population.largest.name}</strong> (${formatNumber(population.largest.pop[year])})</div>` : ''}
         `
-        : `<div style="margin-top:8px;color:#d8defe">Population</div><div>No Census place population loaded for ${year}.</div>`;
+        : `<div style="margin-top:8px;color:#d8d8d8">Population</div><div>No Census place population loaded for ${year}.</div>`;
       return `
-        <strong style="color:#d8defe">${stateName}</strong><br/>
+        <strong style="color:#d8d8d8">${stateName}</strong><br/>
         <span style="color:#aaa">Selected year: ${year}</span>
-        <div style="margin-top:8px;color:#d8defe">Air quality</div>
+        <div style="margin-top:8px;color:#d8d8d8">Air quality</div>
         <div>Monitors: <strong>${formatNumber(air.monitorCount)}</strong></div>
         <div>Average AQI: <strong>${formatNumber(air.avgAqi, 1)}</strong></div>
         <div>Max AQI: <strong>${formatNumber(air.maxAqi)}</strong></div>
@@ -576,14 +686,79 @@
         `<div>${item.name}: <strong>${formatNumber(item.value, item.name === 'Ozone' ? 4 : 2)}</strong> ${pollutantUnit(item.name)}</div>`
       ).join('');
       return `
-        <strong style="color:#d8defe">${countyName} County</strong><br/>
+        <strong style="color:#d8d8d8">${countyName} County</strong><br/>
         <span style="color:#aaa">${stateName} - ${year}</span>
-        <div style="margin-top:8px;color:#d8defe">Air quality</div>
+        <div style="margin-top:8px;color:#d8d8d8">Air quality</div>
         <div>Monitors: <strong>${formatNumber(air.monitorCount)}</strong></div>
         <div>Average AQI: <strong>${formatNumber(air.avgAqi, 1)}</strong></div>
         <div>Max AQI: <strong>${formatNumber(air.maxAqi)}</strong></div>
         ${pollutantRows ? `<div style="margin-top:6px">${pollutantRows}</div>` : '<div>No pollutant averages for this county/year.</div>'}
       `;
+    }
+
+    function computeStateAQIColor(stateName, year) {
+      const needle = normalizeName(stateName);
+      const aqis = (HISTORICAL_DATA[year] || [])
+        .filter(s => normalizeName(s.state) === needle && s.aqi != null)
+        .map(s => s.aqi);
+      const avg = average(aqis);
+      return avg != null ? aqiColor(avg) : null;
+    }
+
+    function computeStateDensityColor(stateName, year) {
+      if (!hasPopulationYear(year)) return null;
+      const needle = normalizeName(stateName);
+      const total = POPULATION_CITIES
+        .filter(c => normalizeName(c.stateName) === needle && c.pop[year] != null)
+        .reduce((sum, c) => sum + Number(c.pop[year]), 0);
+      return densityColor(total / (STATE_LAND_AREA[stateName] || 1));
+    }
+
+    function updateStateChoropleth(year) {
+      if (!statesGeoJSON || !map.getLayer('states-fill')) return;
+
+      if (choroplethMode === 'none') {
+        map.setPaintProperty('states-fill', 'fill-color',
+          ['case', ['boolean', ['feature-state', 'hover'], false], '#667788', '#303030']);
+        map.setPaintProperty('states-fill', 'fill-opacity',
+          ['case', ['boolean', ['feature-state', 'hover'], false], 0.7, 0.45]);
+        updateCountyChoropleth(year);
+        return;
+      }
+
+      // Build a match expression so every state gets its own literal color string.
+      // This avoids MapLibre's type-coercion issues with ['get', prop] in fill-color.
+      const matchArr = ['match', ['get', 'name']];
+      statesGeoJSON.features.forEach(f => {
+        const name = f.properties.name;
+        const color = choroplethMode === 'aqi'
+          ? (computeStateAQIColor(name, year)     || '#607090')
+          : (computeStateDensityColor(name, year) || '#555555');
+        matchArr.push(name, color);
+      });
+      matchArr.push('#555555'); // fallback for unmatched features
+
+      map.setPaintProperty('states-fill', 'fill-color',   matchArr);
+      map.setPaintProperty('states-fill', 'fill-opacity', 0.78);
+
+      updateCountyChoropleth(year);
+    }
+
+    function updateCountyChoropleth(year) {
+      if (!countiesGeoJSON || !map.getLayer('counties-fill')) return;
+
+      if (choroplethMode !== 'aqi') {
+        // Reset to hover-only style
+        map.setPaintProperty('counties-fill', 'fill-color', '#888888');
+        map.setPaintProperty('counties-fill', 'fill-opacity',
+          ['case', ['boolean', ['feature-state', 'hover'], false], 0.45, 0]);
+        return;
+      }
+      // Keep county polygons transparent while State AQI mode is active
+      // so state-level AQI color remains visible at all zoom levels.
+      map.setPaintProperty('counties-fill', 'fill-color', '#888888');
+      map.setPaintProperty('counties-fill', 'fill-opacity',
+        ['case', ['boolean', ['feature-state', 'hover'], false], 0.45, 0]);
     }
 
     // Pre-bake circle color into each feature so MapLibre can use ['get', 'color']
@@ -636,7 +811,7 @@
       maxBounds: [[-180, 10], [-50, 75]]
     });
 
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.addControl(new maplibregl.NavigationControl(), 'bottom-left');
     map.addControl(new maplibregl.ScaleControl(), 'bottom-right');
 
     const tooltip   = document.getElementById('tooltip');
@@ -648,7 +823,20 @@
     let compareMap      = null;
     let compareReady    = false;
     let compareYearIdx  = currentYearIdx;
-    let syncingMaps     = false;
+    let compareAirEnabled = true;
+    let comparePopulationEnabled = true;
+    let compareStatesGeoJSON = null;
+    let compareChoroplethMode = 'none'; // 'none' | 'aqi' | 'density'
+    let compareCountiesLoaded = false;
+    let compareCountiesLoading = false;
+    let syncingMaps      = false;
+    let statesGeoJSON    = null;
+    let countiesGeoJSON  = null;
+    let choroplethMode   = 'none'; // 'none' | 'aqi' | 'density'
+    let showWeatherOverlayMain = false;
+    let showWeatherOverlayCompare = false;
+    let weatherDrawFrameMain = null;
+    let weatherDrawFrameCompare = null;
 
 
     // ======================================================
@@ -660,12 +848,13 @@
         'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
       ).then(r => r.json());
 
-      map.addSource('states', { type: 'geojson', data: geojson });
+      statesGeoJSON = geojson;
+      map.addSource('states', { type: 'geojson', data: statesGeoJSON });
 
       map.addLayer({
         id: 'states-fill', type: 'fill', source: 'states',
         paint: {
-          'fill-color':   ['case', ['boolean', ['feature-state', 'hover'], false], '#5566ff', '#2a3060'],
+          'fill-color':   ['case', ['boolean', ['feature-state', 'hover'], false], '#667788', '#303030'],
           'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.7, 0.45]
         }
       });
@@ -673,9 +862,9 @@
       map.addLayer({
         id: 'states-border', type: 'line', source: 'states',
         paint: {
-          'line-color':   '#7788ff',
-          'line-width':   ['case', ['boolean', ['feature-state', 'hover'], false], 2, 1],
-          'line-opacity': 0.9
+          'line-color':   '#888888',
+          'line-width':   ['case', ['boolean', ['feature-state', 'hover'], false], 4, 2.25],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 3, 0.95, 5.5, 0.75, 6.2, 0]
         }
       });
 
@@ -689,8 +878,8 @@
           'text-allow-overlap': false
         },
         paint: {
-          'text-color':      '#c0caff',
-          'text-halo-color': '#0a0a1e',
+          'text-color':      '#c0c0c0',
+          'text-halo-color': '#0a0a0a',
           'text-halo-width': 1.5
         }
       });
@@ -711,12 +900,13 @@
           'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
         ).then(r => r.json());
 
-        map.addSource('counties', { type: 'geojson', data: geojson, generateId: true });
+        countiesGeoJSON = geojson;
+        map.addSource('counties', { type: 'geojson', data: countiesGeoJSON, generateId: true });
 
         map.addLayer({
           id: 'counties-fill', type: 'fill', source: 'counties',
           paint: {
-            'fill-color':   '#7788ff',
+            'fill-color':   '#888888',
             'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.45, 0]
           }
         }, 'states-fill');
@@ -724,13 +914,14 @@
         map.addLayer({
           id: 'counties-border', type: 'line', source: 'counties',
           paint: {
-            'line-color':   '#4455aa',
-            'line-width':   0.6,
-            'line-opacity': ['interpolate', ['linear'], ['zoom'], COUNTY_ZOOM, 0, COUNTY_ZOOM + 0.5, 0.7]
+            'line-color':   '#556677',
+            'line-width':   ['interpolate', ['linear'], ['zoom'], COUNTY_ZOOM, 0.9, 7, 1.6, 10, 2.4],
+            'line-opacity': ['interpolate', ['linear'], ['zoom'], COUNTY_ZOOM, 0.35, COUNTY_ZOOM + 0.5, 0.9]
           }
         }, 'states-border');
 
         countiesLoaded = true;
+        updateCountyChoropleth(YEARS[currentYearIdx]);
       } catch (err) {
         console.error('County load failed:', err);
         countiesLoading = false;
@@ -745,10 +936,66 @@
     // ======================================================
 
     function addSites2DLayer() {
-      map.addSource('sites', { type: 'geojson', data: yearToGeoJSON(YEARS[currentYearIdx]) });
+      map.addSource('sites', {
+        type: 'geojson',
+        data: yearToGeoJSON(YEARS[currentYearIdx]),
+        cluster: true,
+        clusterMaxZoom: 6,   // dissolves to individual dots at zoom 6+
+        clusterRadius: 28,   // tighter grouping = more readable clusters
+        clusterProperties: {
+          // sum of aqi values (nulls mapped to 0)
+          sumAqi: [['+', ['accumulated'], ['get', 'sumAqi']], ['coalesce', ['get', 'aqi'], 0]],
+          // count of sites that actually have an aqi value
+          cntAqi: [['+', ['accumulated'], ['get', 'cntAqi']],
+                   ['case', ['!=', ['coalesce', ['get', 'aqi'], -1], -1], 1, 0]]
+        }
+      });
 
+      // Cluster circles colored by average AQI of grouped sites
       map.addLayer({
-        id: 'sites-2d', type: 'circle', source: 'sites',
+        id: 'sites-cluster', type: 'circle', source: 'sites',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': [
+            'case',
+            ['==', ['get', 'cntAqi'], 0], '#607090',  // all sites have no data
+            ['step',
+              ['/', ['get', 'sumAqi'], ['get', 'cntAqi']],
+              '#78FF78',   // 0-50  Good
+              50,  '#E3B500',  // Moderate
+              100, '#E07000',  // Unhealthy for Some
+              150, '#980000',  // Unhealthy
+              200, '#520029',  // Very Unhealthy
+              300, '#290000'   // Hazardous
+            ]
+          ],
+          'circle-radius':        ['step', ['get', 'point_count'], 14, 20, 18, 100, 24],
+          'circle-opacity':       0.88,
+          'circle-stroke-color':  'rgba(255,255,255,0.55)',
+          'circle-stroke-width':  1.5
+        }
+      });
+
+      // Cluster count labels
+      map.addLayer({
+        id: 'sites-cluster-count', type: 'symbol', source: 'sites',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': '{point_count_abbreviated}',
+          'text-font':  ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size':  12
+        },
+        paint: {
+          'text-color':       '#ffffff',
+          'text-halo-color':  'rgba(0,0,0,0.55)',
+          'text-halo-width':  1.5
+        }
+      });
+
+      // Individual points (not part of a cluster)
+      map.addLayer({
+        id: 'sites-unclustered', type: 'circle', source: 'sites',
+        filter: ['!', ['has', 'point_count']],
         paint: {
           'circle-color':          ['get', 'color'],
           'circle-radius':         ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 7],
@@ -836,7 +1083,7 @@
             0.18
           ]
         }
-      }, 'sites-2d');
+      }, 'sites-cluster');
 
       map.addLayer({
         id: 'population-point',
@@ -850,7 +1097,7 @@
           'circle-stroke-width': 0.8,
           'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 3, 0, 6, 0.42]
         }
-      }, 'sites-2d');
+      }, 'sites-cluster');
 
       map.addLayer({
         id: 'population-label',
@@ -878,6 +1125,7 @@
       const geojson = await fetch(
         'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
       ).then(r => r.json());
+      compareStatesGeoJSON = geojson;
 
       targetMap.addSource('states', { type: 'geojson', data: geojson });
       targetMap.addLayer({
@@ -885,7 +1133,7 @@
         type: 'fill',
         source: 'states',
         paint: {
-          'fill-color': '#2a3060',
+          'fill-color': '#303030',
           'fill-opacity': 0.35
         }
       });
@@ -894,9 +1142,9 @@
         type: 'line',
         source: 'states',
         paint: {
-          'line-color': '#7788ff',
-          'line-width': 1,
-          'line-opacity': 0.85
+          'line-color': '#9fb0ff',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 3, 2.4, 8, 1.4, 12, 1.0],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 3, 0.98, 6.5, 0.78, 10, 0.56, 12, 0.46]
         }
       });
       targetMap.addLayer({
@@ -918,6 +1166,71 @@
       });
     }
 
+    async function loadCompareCounties() {
+      if (!compareMap || compareCountiesLoaded || compareCountiesLoading) return;
+      compareCountiesLoading = true;
+      try {
+        const geojson = await fetch(
+          'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
+        ).then(r => r.json());
+
+        compareMap.addSource('counties', { type: 'geojson', data: geojson, generateId: true });
+
+        // Transparent fill so counties are clickable in the compare map.
+        compareMap.addLayer({
+          id: 'counties-fill',
+          type: 'fill',
+          source: 'counties',
+          paint: {
+            'fill-color': '#888888',
+            'fill-opacity': 0
+          }
+        }, 'states-fill');
+
+        // Minimal county styling (lines only). Keep them subtle under state borders.
+        compareMap.addLayer({
+          id: 'counties-border',
+          type: 'line',
+          source: 'counties',
+          paint: {
+            'line-color': '#5a6372',
+            'line-width': ['interpolate', ['linear'], ['zoom'], COUNTY_ZOOM, 0.8, 7, 1.2, 10, 1.8],
+            'line-opacity': ['interpolate', ['linear'], ['zoom'], COUNTY_ZOOM - 0.2, 0, COUNTY_ZOOM, 0.55, 8, 0.75, 12, 0.9]
+          }
+        }, 'states-border');
+
+        compareCountiesLoaded = true;
+      } catch (err) {
+        console.error('Compare county load failed:', err);
+      } finally {
+        compareCountiesLoading = false;
+      }
+    }
+
+    function updateCompareStateChoropleth(year) {
+      if (!compareReady || !compareMap || !compareMap.getLayer('states-fill') || !compareStatesGeoJSON) return;
+
+      if (compareChoroplethMode === 'none') {
+        compareMap.setPaintProperty('states-fill', 'fill-color', '#303030');
+        compareMap.setPaintProperty('states-fill', 'fill-opacity', 0.35);
+        return;
+      }
+
+      const matchArr = ['match', ['get', 'name']];
+      compareStatesGeoJSON.features.forEach(f => {
+        const name = f.properties.name;
+        const color =
+          compareChoroplethMode === 'aqi'
+            ? (computeStateAQIColor(name, year) || '#607090')
+            : (computeStateDensityColor(name, year) || '#555555');
+        matchArr.push(name, color);
+      });
+      matchArr.push(compareChoroplethMode === 'aqi' ? '#607090' : '#555555');
+
+      compareMap.setPaintProperty('states-fill', 'fill-color', matchArr);
+      compareMap.setPaintProperty('states-fill', 'fill-opacity', 0.78);
+    }
+
     function addCompareDataLayers(targetMap, year) {
       targetMap.addSource('population-cities', {
         type: 'geojson',
@@ -937,11 +1250,66 @@
         }
       }, 'states-label');
 
-      targetMap.addSource('sites', { type: 'geojson', data: yearToGeoJSON(year) });
+      targetMap.addSource('sites', {
+        type: 'geojson',
+        data: yearToGeoJSON(year),
+        cluster: true,
+        clusterMaxZoom: 6,
+        clusterRadius: 28,
+        clusterProperties: {
+          sumAqi: [['+', ['accumulated'], ['get', 'sumAqi']], ['coalesce', ['get', 'aqi'], 0]],
+          cntAqi: [['+', ['accumulated'], ['get', 'cntAqi']],
+                   ['case', ['!=', ['coalesce', ['get', 'aqi'], -1], -1], 1, 0]]
+        }
+      });
       targetMap.addLayer({
-        id: 'sites-2d',
+        id: 'sites-cluster',
         type: 'circle',
         source: 'sites',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': [
+            'case',
+            ['==', ['get', 'cntAqi'], 0], '#607090',
+            ['step',
+              ['/', ['get', 'sumAqi'], ['get', 'cntAqi']],
+              '#78FF78',
+              50, '#E3B500',
+              100, '#E07000',
+              150, '#980000',
+              200, '#520029',
+              300, '#290000'
+            ]
+          ],
+          'circle-radius': ['step', ['get', 'point_count'], 14, 20, 18, 100, 24],
+          'circle-opacity': 0.88,
+          'circle-stroke-color': 'rgba(255,255,255,0.55)',
+          'circle-stroke-width': 1.5
+        }
+      });
+
+      targetMap.addLayer({
+        id: 'sites-cluster-count',
+        type: 'symbol',
+        source: 'sites',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': '{point_count_abbreviated}',
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': 12
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': 'rgba(0,0,0,0.55)',
+          'text-halo-width': 1.5
+        }
+      });
+
+      targetMap.addLayer({
+        id: 'sites-unclustered',
+        type: 'circle',
+        source: 'sites',
+        filter: ['!', ['has', 'point_count']],
         paint: {
           'circle-color': ['get', 'color'],
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 7],
@@ -952,16 +1320,20 @@
         }
       });
 
+      // Keep state borders above data layers so they remain visible in split view.
+      if (targetMap.getLayer('states-border')) targetMap.moveLayer('states-border');
+      if (targetMap.getLayer('states-label')) targetMap.moveLayer('states-label');
+
       setCompareLayerVisibility();
     }
 
     function setCompareLayerVisibility() {
       if (!compareReady || !compareMap) return;
-      const airVisible = document.getElementById('toggle-air').checked;
-      const populationVisible = document.getElementById('toggle-population').checked && hasPopulationYear(YEARS[compareYearIdx]);
-      if (compareMap.getLayer('sites-2d')) {
-        compareMap.setLayoutProperty('sites-2d', 'visibility', airVisible ? 'visible' : 'none');
-      }
+      const airVisible = compareAirEnabled;
+      const populationVisible = comparePopulationEnabled && hasPopulationYear(YEARS[compareYearIdx]);
+      ['sites-unclustered', 'sites-cluster', 'sites-cluster-count'].forEach(id => {
+        if (compareMap.getLayer(id)) compareMap.setLayoutProperty(id, 'visibility', airVisible ? 'visible' : 'none');
+      });
       if (compareMap.getLayer('population-heat')) {
         compareMap.setLayoutProperty('population-heat', 'visibility', populationVisible ? 'visible' : 'none');
       }
@@ -976,6 +1348,87 @@
       if (compareMap.getSource('sites')) compareMap.getSource('sites').setData(yearToGeoJSON(year));
       if (compareMap.getSource('population-cities')) compareMap.getSource('population-cities').setData(populationToGeoJSON(year));
       setCompareLayerVisibility();
+      updateCompareStateChoropleth(year);
+      scheduleWeatherRedrawCompare();
+    }
+
+    function setupCompareInteractions() {
+      if (!compareMap) return;
+
+      compareMap.on('mousemove', 'sites-unclustered', () => {
+        compareMap.getCanvas().style.cursor = 'pointer';
+      });
+      compareMap.on('mouseleave', 'sites-unclustered', () => {
+        compareMap.getCanvas().style.cursor = '';
+      });
+
+      compareMap.on('click', 'sites-cluster', (e) => {
+        const feat = compareMap.queryRenderedFeatures(e.point, { layers: ['sites-cluster'] })[0];
+        if (!feat) return;
+        compareMap.getSource('sites').getClusterExpansionZoom(feat.properties.cluster_id, (err, zoom) => {
+          if (err) return;
+          compareMap.easeTo({ center: feat.geometry.coordinates, zoom: zoom + 0.5 });
+        });
+      });
+      compareMap.on('mouseenter', 'sites-cluster', () => { compareMap.getCanvas().style.cursor = 'pointer'; });
+      compareMap.on('mouseleave', 'sites-cluster', () => { compareMap.getCanvas().style.cursor = ''; });
+
+      // Site marker click popup (same content style as the main map).
+      compareMap.on('click', 'sites-unclustered', (e) => {
+        const p = e.features[0]?.properties;
+        if (!p) return;
+        const rows = [];
+        if (p.aqi   != null) rows.push(`AQI: <strong>${p.aqi}</strong>`);
+        if (p.pm25  != null) rows.push(`PM2.5: ${(+p.pm25).toFixed(1)} µg/m³`);
+        if (p.ozone != null) rows.push(`Ozone: ${(+p.ozone * 1000).toFixed(1)} ppb`);
+        if (p.no2   != null) rows.push(`NO₂: ${(+p.no2).toFixed(2)} ppb`);
+        if (p.so2   != null) rows.push(`SO₂: ${(+p.so2).toFixed(2)} ppb`);
+        if (p.co    != null) rows.push(`CO: ${(+p.co).toFixed(2)} ppm`);
+        if (p.pm10  != null) rows.push(`PM10: ${(+p.pm10).toFixed(1)} µg/m³`);
+        new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+          .setLngLat(e.lngLat)
+          .setHTML(`
+            <strong style="color:#aaaaaa">${p.name || 'Monitor'}</strong><br/>
+            <span style="color:#aaa">${p.state}${p.county ? ', ' + p.county : ''}</span>
+            ${rows.length ? '<br/>' + rows.join('<br/>') : ''}
+          `)
+          .addTo(compareMap);
+      });
+
+      // State/county summary popup for the compare map year.
+      compareMap.on('click', 'states-fill', (e) => {
+        if (compareMap.queryRenderedFeatures(e.point, { layers: ['sites-unclustered'] }).length) return;
+        if (compareCountiesLoaded && compareMap.getZoom() >= COUNTY_ZOOM) {
+          const countyHits = compareMap.queryRenderedFeatures(e.point, {
+            layers: ['counties-fill', 'counties-border']
+          });
+          if (countyHits.length) {
+            // County handler will show the popup; avoid double-popups.
+            return;
+          }
+        }
+
+        const name = e.features[0]?.properties?.name;
+        if (!name) return;
+        new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+          .setLngLat(e.lngLat)
+          .setHTML(buildStatePopupHTML(name, YEARS[compareYearIdx]))
+          .addTo(compareMap);
+      });
+
+      // County click popup (compare map)
+      compareMap.on('click', 'counties-fill', (e) => {
+        const county = e.features?.[0];
+        if (!county) return;
+        const countyName = county.properties?.NAME || '';
+        const stateFips = county.properties?.STATE || '';
+        const stateName = FIPS_TO_STATE[stateFips] || '';
+        if (!countyName || !stateName) return;
+        new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+          .setLngLat(e.lngLat)
+          .setHTML(buildCountyPopupHTML(countyName, stateName, YEARS[compareYearIdx]))
+          .addTo(compareMap);
+      });
     }
 
     function syncMapPair(source, target) {
@@ -1005,9 +1458,18 @@
       compareMap.on('load', async () => {
         await addCompareStatesLayer(compareMap);
         addCompareDataLayers(compareMap, YEARS[compareYearIdx]);
+        setupCompareInteractions();
         compareReady = true;
         updateCompareYear(compareYearIdx);
+        updateCompareStateChoropleth(YEARS[compareYearIdx]);
         compareMap.on('move', () => syncMapPair(compareMap, map));
+        compareMap.on('move', scheduleWeatherRedrawCompare);
+        compareMap.on('moveend', scheduleWeatherRedrawCompare);
+        compareMap.on('zoomend', scheduleWeatherRedrawCompare);
+
+        // Counties on compare map load lazily by zoom threshold
+        if (compareMap.getZoom() >= COUNTY_ZOOM) loadCompareCounties();
+        compareMap.on('zoom', () => { if (compareMap.getZoom() >= COUNTY_ZOOM) loadCompareCounties(); });
       });
       map.on('move', () => syncMapPair(map, compareMap));
     }
@@ -1018,6 +1480,8 @@
       requestAnimationFrame(() => {
         map.resize();
         if (compareMap) compareMap.resize();
+        scheduleWeatherRedrawMain();
+        scheduleWeatherRedrawCompare();
       });
     }
 
@@ -1103,8 +1567,20 @@
         tooltip.style.display = 'none';
       });
 
+      // ----- Cluster click: zoom in to expand -----
+      map.on('click', 'sites-cluster', (e) => {
+        const feat = map.queryRenderedFeatures(e.point, { layers: ['sites-cluster'] })[0];
+        if (!feat) return;
+        map.getSource('sites').getClusterExpansionZoom(feat.properties.cluster_id, (err, zoom) => {
+          if (err) return;
+          map.easeTo({ center: feat.geometry.coordinates, zoom: zoom + 0.5 });
+        });
+      });
+      map.on('mouseenter', 'sites-cluster', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'sites-cluster', () => { map.getCanvas().style.cursor = ''; });
+
       // ----- Site marker hover -----
-      map.on('mousemove', 'sites-2d', (e) => {
+      map.on('mousemove', 'sites-unclustered', (e) => {
         map.getCanvas().style.cursor = 'pointer';
         const f = e.features[0];
         if (!f) return;
@@ -1117,10 +1593,10 @@
         if (p.ozone != null) pollutants.push(`Ozone: ${(+p.ozone * 1000).toFixed(1)} ppb`);
         if (p.no2   != null) pollutants.push(`NO₂: ${(+p.no2).toFixed(2)} ppb`);
         if (p.so2   != null) pollutants.push(`SO₂: ${(+p.so2).toFixed(2)} ppb`);
-        tooltip.innerHTML = `<strong>${p.name || 'Monitor'}</strong><br/><span style="color:#8899ff">${p.state}${p.county ? ', ' + p.county : ''}</span>${p.aqi != null ? `<br/>AQI: <strong>${p.aqi}</strong>` : ''}${pollutants.length ? '<br/>' + pollutants.join('<br/>') : ''}`;
+        tooltip.innerHTML = `<strong>${p.name || 'Monitor'}</strong><br/><span style="color:#aaaaaa">${p.state}${p.county ? ', ' + p.county : ''}</span>${p.aqi != null ? `<br/>AQI: <strong>${p.aqi}</strong>` : ''}${pollutants.length ? '<br/>' + pollutants.join('<br/>') : ''}`;
       });
 
-      map.on('mouseleave', 'sites-2d', () => {
+      map.on('mouseleave', 'sites-unclustered', () => {
         map.getCanvas().style.cursor = '';
         tooltip.style.display = 'none';
       });
@@ -1145,7 +1621,7 @@
       });
 
       // ----- Site marker click -----
-      map.on('click', 'sites-2d', (e) => {
+      map.on('click', 'sites-unclustered', (e) => {
         const p = e.features[0]?.properties;
         if (!p) return;
         const rows = [];
@@ -1159,7 +1635,7 @@
         new maplibregl.Popup({ closeButton: true, closeOnClick: true })
           .setLngLat(e.lngLat)
           .setHTML(`
-            <strong style="color:#8899ff">${p.name || 'Monitor'}</strong><br/>
+            <strong style="color:#aaaaaa">${p.name || 'Monitor'}</strong><br/>
             <span style="color:#aaa">${p.state}${p.county ? ', ' + p.county : ''}</span>
             ${rows.length ? '<br/>' + rows.join('<br/>') : ''}
           `)
@@ -1172,7 +1648,7 @@
         new maplibregl.Popup({ closeButton: true, closeOnClick: true })
           .setLngLat(e.lngLat)
           .setHTML(`
-            <strong style="color:#d8defe">${p.name}, ${p.state}</strong><br/>
+            <strong style="color:#d8d8d8">${p.name}, ${p.state}</strong><br/>
             Population ${p.popYear}: <strong>${Number(p.population).toLocaleString()}</strong>
             ${p.change == null ? '' : `<br/>Change from ${Number(p.popYear) - 1}: <strong>${Number(p.change).toLocaleString()}</strong> (${Number(p.changePct).toFixed(2)}%)`}
           `)
@@ -1182,7 +1658,7 @@
       // ----- State / County click -----
       map.on('click', 'states-fill', (e) => {
         // Let site clicks take priority
-        if (map.queryRenderedFeatures(e.point, { layers: ['sites-2d'] }).length) return;
+        if (map.queryRenderedFeatures(e.point, { layers: ['sites-unclustered'] }).length) return;
         if (map.queryRenderedFeatures(e.point, { layers: ['population-point'] }).length) return;
 
         if (countiesLoaded && map.getZoom() >= COUNTY_ZOOM) {
@@ -1218,23 +1694,135 @@
     }
 
     function initLayerControls() {
-      const airToggle = document.getElementById('toggle-air');
-      const populationToggle = document.getElementById('toggle-population');
-      const windToggle = document.getElementById('toggle-wind');
-      const splitToggle = document.getElementById('toggle-split');
+      const airToggle      = document.getElementById('toggle-air');
+      const popToggle      = document.getElementById('toggle-population');
+      const windToggle     = document.getElementById('toggle-wind');
+      const weatherToggle  = document.getElementById('toggle-weather-overlay');
+      const aqiChoroToggle = document.getElementById('toggle-aqi-choropleth');
+      const densityToggle  = document.getElementById('toggle-density-choropleth');
+      const splitToggle    = document.getElementById('toggle-split');
+      const compareAirToggle = document.getElementById('toggle-compare-air');
+      const comparePopulationToggle = document.getElementById('toggle-compare-population');
+      const compareWindToggle = document.getElementById('toggle-compare-wind');
+      const compareWeatherToggle = document.getElementById('toggle-compare-weather-overlay');
+      const compareAqiChoroToggle = document.getElementById('toggle-compare-aqi-choropleth');
+      const compareDensityToggle = document.getElementById('toggle-compare-density-choropleth');
+
+      compareAirEnabled = airToggle.checked;
+      comparePopulationEnabled = popToggle.checked;
+      compareAirToggle.checked = compareAirEnabled;
+      comparePopulationToggle.checked = comparePopulationEnabled;
+      compareWindToggle.checked = windToggle.checked;
+      compareWeatherToggle.checked = false;
+      showWeatherOverlayCompare = false;
+      weatherCanvasCompare.style.display = 'none';
+      // Wind is a global full-screen canvas, so it can't be per-map.
+      compareWindToggle.disabled = true;
+      compareWindToggle.title = 'Shared layer (controls left map)';
+
+      // AQI overlay is now per-map (two canvases).
+      compareWeatherToggle.disabled = false;
+      compareWeatherToggle.title = 'Compare-map overlay only';
+      compareAqiChoroToggle.checked = false;
+      compareDensityToggle.checked = false;
 
       airToggle.addEventListener('change', () => {
-        setLayerVisibility('sites-2d', airToggle.checked);
+        const v = airToggle.checked;
+        ['sites-unclustered', 'sites-cluster', 'sites-cluster-count'].forEach(id => setLayerVisibility(id, v));
+        if (!splitToggle.checked) {
+          compareAirEnabled = v;
+          compareAirToggle.checked = v;
+        }
         setCompareLayerVisibility();
       });
 
-      populationToggle.addEventListener('change', () => {
+      popToggle.addEventListener('change', () => {
         setPopulationVisibilityForYear(YEARS[currentYearIdx]);
+        if (!splitToggle.checked) {
+          comparePopulationEnabled = popToggle.checked;
+          comparePopulationToggle.checked = popToggle.checked;
+        }
         setCompareLayerVisibility();
       });
 
       windToggle.addEventListener('change', () => {
+        if (compareWindToggle) compareWindToggle.checked = windToggle.checked;
+      });
+
+      // Main AQI overlay is independent from compare map overlay.
+
+      compareAirToggle.addEventListener('change', () => {
+        compareAirEnabled = compareAirToggle.checked;
+        setCompareLayerVisibility();
+      });
+
+      comparePopulationToggle.addEventListener('change', () => {
+        comparePopulationEnabled = comparePopulationToggle.checked;
+        setCompareLayerVisibility();
+      });
+
+      compareWeatherToggle.addEventListener('change', () => {
+        showWeatherOverlayCompare = compareWeatherToggle.checked;
+        weatherCanvasCompare.style.display =
+          showWeatherOverlayCompare && document.body.classList.contains('split-view') ? 'block' : 'none';
+        scheduleWeatherRedrawCompare();
+      });
+
+      compareAqiChoroToggle.addEventListener('change', () => {
+        if (compareAqiChoroToggle.checked) {
+          compareDensityToggle.checked = false;
+          compareChoroplethMode = 'aqi';
+        } else {
+          compareChoroplethMode = 'none';
+        }
+        updateCompareStateChoropleth(YEARS[compareYearIdx]);
+      });
+
+      compareDensityToggle.addEventListener('change', () => {
+        if (compareDensityToggle.checked) {
+          compareAqiChoroToggle.checked = false;
+          compareChoroplethMode = 'density';
+        } else {
+          compareChoroplethMode = 'none';
+        }
+        updateCompareStateChoropleth(YEARS[compareYearIdx]);
+      });
+
+      windToggle.addEventListener('change', () => {
         document.getElementById('wind-canvas').style.display = windToggle.checked ? 'block' : 'none';
+      });
+
+      weatherToggle.addEventListener('change', () => {
+        showWeatherOverlayMain = weatherToggle.checked;
+        weatherCanvasMain.style.display = showWeatherOverlayMain ? 'block' : 'none';
+        if (showWeatherOverlayMain) scheduleWeatherRedrawMain();
+        else {
+          const rect = map.getContainer().getBoundingClientRect();
+          weatherCtxMain.clearRect(0, 0, rect.width, rect.height);
+        }
+      });
+
+      aqiChoroToggle.addEventListener('change', () => {
+        if (aqiChoroToggle.checked) {
+          densityToggle.checked = false;
+          choroplethMode = 'aqi';
+          document.getElementById('legend-density').style.display = 'none';
+        } else {
+          choroplethMode = 'none';
+        }
+        updateStateChoropleth(YEARS[currentYearIdx]);
+      });
+
+      densityToggle.addEventListener('change', () => {
+        if (densityToggle.checked) {
+          aqiChoroToggle.checked = false;
+          choroplethMode = 'density';
+          document.getElementById('legend-density').style.display = 'block';
+        } else {
+          choroplethMode = 'none';
+          document.getElementById('legend-density').style.display = 'none';
+        }
+        updateStateChoropleth(YEARS[currentYearIdx]);
       });
 
       splitToggle.addEventListener('change', () => setSplitView(splitToggle.checked));
@@ -1250,6 +1838,11 @@
     let windParticles = [];
     let windYear = YEARS[currentYearIdx] || 2024;
     let windFrame = null;
+
+    const weatherCanvasMain = document.getElementById('weather-canvas-main');
+    const weatherCtxMain = weatherCanvasMain.getContext('2d');
+    const weatherCanvasCompare = document.getElementById('weather-canvas-compare');
+    const weatherCtxCompare = weatherCanvasCompare.getContext('2d');
 
     function resizeWindCanvas() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1295,7 +1888,7 @@
       windCtx.fillStyle = 'rgba(8, 10, 18, 0.075)';
       windCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
       windCtx.lineWidth = 1;
-      windCtx.strokeStyle = 'rgba(184, 210, 255, 0.34)';
+      windCtx.strokeStyle = 'rgba(200, 210, 220, 0.34)';
 
       for (const particle of windParticles) {
         const v = windVector(particle.x, particle.y, time);
@@ -1328,11 +1921,113 @@
     function initWindAnimation() {
       resizeWindCanvas();
       updateWindForYear(YEARS[currentYearIdx]);
-      window.addEventListener('resize', resizeWindCanvas);
+      window.addEventListener('resize', () => {
+        resizeWindCanvas();
+        scheduleWeatherRedrawMain();
+        scheduleWeatherRedrawCompare();
+      });
       if (windFrame) cancelAnimationFrame(windFrame);
       windFrame = requestAnimationFrame(drawWind);
     }
 
+
+    // ======================================================
+    // AQI WEATHER OVERLAY  (localized radial interpolation)
+    // ======================================================
+
+    function aqiOverlayRadius(aqi, zoom) {
+      const base = Math.max(22, 112 - zoom * 14);
+      if (aqi <= 50) return base * 0.72;
+      if (aqi <= 100) return base * 0.9;
+      if (aqi <= 150) return base * 1.05;
+      return base * 1.18;
+    }
+
+    function aqiOverlayOpacity(aqi) {
+      if (aqi <= 50) return 0.18;
+      if (aqi <= 100) return 0.28;
+      if (aqi <= 150) return 0.38;
+      if (aqi <= 200) return 0.46;
+      return 0.52;
+    }
+
+    function resizeOverlayCanvas(canvas, ctx, container) {
+      const rect = container.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.max(1, Math.floor(rect.width * dpr));
+      const height = Math.max(1, Math.floor(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return rect;
+    }
+
+    function drawWeatherOverlayFor({ targetMap, year, canvas, ctx, container, enabled }) {
+      if (!enabled) return;
+      const rect = resizeOverlayCanvas(canvas, ctx, container);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const sites  = HISTORICAL_DATA[year] || [];
+      const zoom   = targetMap.getZoom();
+
+      for (const site of sites) {
+        if (site.aqi == null) continue;
+        const px = targetMap.project([site.lon, site.lat]); // relative to container
+        const radius = aqiOverlayRadius(Number(site.aqi), zoom);
+        const cx = px.x;
+        const cy = px.y;
+        if (cx < -radius || cx > rect.width + radius ||
+            cy < -radius || cy > rect.height + radius) continue;
+
+        const [r, g, b] = hexToRgb(aqiColor(site.aqi));
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        const alpha = aqiOverlayOpacity(Number(site.aqi));
+        grad.addColorStop(0,    `rgba(${r},${g},${b},${alpha})`);
+        grad.addColorStop(0.55, `rgba(${r},${g},${b},${alpha * 0.42})`);
+        grad.addColorStop(1,    `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+      }
+    }
+
+    function drawWeatherOverlayMain() {
+      weatherDrawFrameMain = null;
+      drawWeatherOverlayFor({
+        targetMap: map,
+        year: YEARS[currentYearIdx],
+        canvas: weatherCanvasMain,
+        ctx: weatherCtxMain,
+        container: map.getContainer(),
+        enabled: showWeatherOverlayMain
+      });
+    }
+
+    function drawWeatherOverlayCompare() {
+      weatherDrawFrameCompare = null;
+      if (!compareMap) return;
+      drawWeatherOverlayFor({
+        targetMap: compareMap,
+        year: YEARS[compareYearIdx],
+        canvas: weatherCanvasCompare,
+        ctx: weatherCtxCompare,
+        container: compareMap.getContainer(),
+        enabled: showWeatherOverlayCompare && document.body.classList.contains('split-view')
+      });
+    }
+
+    function scheduleWeatherRedrawMain() {
+      if (weatherDrawFrameMain) return;
+      weatherDrawFrameMain = requestAnimationFrame(drawWeatherOverlayMain);
+    }
+
+    function scheduleWeatherRedrawCompare() {
+      if (weatherDrawFrameCompare) return;
+      weatherDrawFrameCompare = requestAnimationFrame(drawWeatherOverlayCompare);
+    }
 
     // ======================================================
     // YEAR SLIDER
@@ -1354,6 +2049,8 @@
       setPopulationVisibilityForYear(year);
       updatePopulationYearNote(year);
       updateWindForYear(year);
+      updateStateChoropleth(year);
+      scheduleWeatherRedrawMain();
     }
 
     function initSlider() {
@@ -1395,6 +2092,11 @@
       if (map.getZoom() >= COUNTY_ZOOM) loadCounties();
       map.on('zoom',     () => { if (map.getZoom() >= COUNTY_ZOOM) loadCounties(); });
       map.on('dblclick', () => loadCounties());
+
+      // Redraw weather overlay as the map moves so the canvas stays registered.
+      map.on('move', scheduleWeatherRedrawMain);
+      map.on('moveend', scheduleWeatherRedrawMain);
+      map.on('zoomend', scheduleWeatherRedrawMain);
 
       setupInteractions();
     });
